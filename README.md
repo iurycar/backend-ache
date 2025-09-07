@@ -57,11 +57,13 @@ Certifique-se de ter o `Python 3.8+` e o `pip` instalados em seu sistema.
 
 ### 2. Configurar o ambiente
 Clone o repositório:
-```git clone https://github.com/iurycar/backend-ache
+```
+git clone https://github.com/iurycar/backend-ache
 ```
 
 Instale todas as dependências listadas no `requirements.txt`:
-```pip install -r requirements.txt
+```
+pip install -r requirements.txt
 ```
 
 ### 3. Variáveis do ambiente
@@ -77,11 +79,13 @@ GOOGLE_API_KEY="SUA_CHAVE_GEMINI_AQUI"
 
 ### 4. Executar o servidor
 Navegue até o diretório do projeto
-```cd D:\...\backend-aché\
+```
+cd D:\...\backend-aché\
 ```
 
 E execute o seguinte comando, para iniciar o servidor
-```D:\...\backend-aché> python -m backend.app
+```
+D:\...\backend-aché> python -m backend.app
 ```
 
 O servidor estará disponível em `http://127.0.0.1:5000` e pronto para receber requisições do frontend. Para fazer login, use as credenciais simuladas no arquivo `auth.py`:
