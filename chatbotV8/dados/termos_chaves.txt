@@ -1,0 +1,35 @@
+
+olá :: cumprimentar
+oi :: cumprimentar
+tudo bem? :: cumprimentar
+como vai? :: cumprimentar
+bom dia :: cumprimentar
+boa tarde :: cumprimentar
+boa noite :: cumprimentar
+minhas tarefas :: minhas_tarefas
+minha tarefa :: minhas_tarefas
+modo avançado :: chat_avancado
+chat avançado :: chat_avancado
+melora+ :: chat_avancado
+liste os arquivos :: arquivos
+nome dos arquivos :: arquivos
+encontre os arquivos :: arquivos
+defina os arquivos :: arquivos
+encontre as panilhas :: arquivos
+nome das panilhas :: arquivos
+encontre :: pesquisar
+procure por :: pesquisar
+busque por :: pesquisar
+pesquise por :: pesquisar
+estou pesquisando :: pesquisar
+selecione :: pesquisar
+pesquise :: pesquisar
+busque :: pesquisar
+me ajude :: ajude_me
+sem opção :: ajude_me
+ajuda :: ajude_me
+não tem opção :: ajude_me
+não estou entendendo :: ajude_me
+não consigo encontrar :: ajude_me
+preciso de auxilio :: ajude_me
+não acho a opção :: ajude_me

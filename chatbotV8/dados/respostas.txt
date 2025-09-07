@@ -1,0 +1,7 @@
+
+cumprimentar :: Olá, como posso ajudá-lo? 😊
+chat_avancado :: 1
+minhas_tarefas :: 2
+arquivos :: 3
+pesquisar :: 4
+ajude_me :: 5
