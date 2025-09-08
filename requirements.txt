@@ -3,4 +3,4 @@ python-dotenv
 Flask-Cors
 google-generativeai
 pandas
-oracledb
+mysql-connector-python
