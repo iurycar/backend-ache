@@ -3,3 +3,4 @@ python-dotenv
 Flask-Cors
 google-generativeai
 pandas
+oracledb

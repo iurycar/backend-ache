@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session, send_from_directory, current_app
 from werkzeug.utils import secure_filename
 from pathlib import Path
+from .db import conn
 import datetime
 import uuid
 import json
@@ -11,32 +12,23 @@ import os
     únicos para os dados recebidos e víncula ao usuário.
 """
 
-# ======= ISSO DAQUI PROVAVELMENTE VAI MUDAR =======
-# Esse trecho lida com os metadados dos arquivos
-# Precisamos criar uma tabela no banco de dados 
-# para controlar esses dados de forma mais confiável
+def carregar_metadados(user_id) -> 'Metadados':
+    resultados = conn('SELECT', 'METADATA', 
+    'auth_user_id', user_id,    # SELECIONA ONDE (WHERE) AUTH_USER_ID = USER_ID
+    id_file=None,               # OS ARGS KEY SÃO AS COLUNAS QUE EU QUERO
+    original_name=None,
+    import_date=None,
+    )
 
-# Configura o diretório para o arquivo de metadados
-diretorio = Path(__file__).parent
-METADATA_FILE = diretorio / "dados" / "metadados.json"
-if not os.path.exists(diretorio / "dados"):
-    os.makedirs(diretorio / "dados")
+    return resultados
 
-def carregar_metadados() -> 'Metadados':
-    # Carrega os metadados do arquivo JSON se ele existir.
-    if os.path.exists(METADATA_FILE):
-        with open(METADATA_FILE, 'r') as f:
-            return json.load(f)
-    return {}
+def salvar_metadados(file, name, timestamp, user):
+    conn('INSERT', 'METADATA', 
+    id_file=file, 
+    original_name=name, 
+    import_date=timestamp, 
+    auth_user_id=user)
 
-def salvar_metadados(dado):
-    # Salva os metadados no arquivo JSON.
-    with open(METADATA_FILE, 'w') as f:
-        json.dump(dado, f, indent=4)
-
-# Dicionário para armazenar metadados dos arquivos
-metadado_arquivo_importado = carregar_metadados()
-# ===================================================
 
 # Criação do Blueprint/Projeto da aplicação de upload/download de arquivos
 file_bp = Blueprint('file_bp', __name__)
@@ -66,30 +58,27 @@ def upload():
             return({'mensagem': 'Formato do arquivo incompatível.'}), 400
 
         # Torna o nome do arquivo seguro e o armazena
-        arquivo_nome = secure_filename(arquivo.filename)
-        nome_unico = f"{uuid.uuid4()}_{arquivo_nome}"   # Cria um nome único para o arquivo, a fim de evitar duplicidade e conflitos
+        original_name = secure_filename(arquivo.filename)
+        id_file = f"{uuid.uuid4()}.xlsx"   # Cria um nome único para o arquivo, a fim de evitar duplicidade e conflitos
         # Acessa a configuração da aplicação principal
         UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER']
-        arquivo_caminho = os.path.join(UPLOAD_FOLDER, nome_unico)
+        arquivo_caminho = os.path.join(UPLOAD_FOLDER, id_file)
 
         # Salva o arquivo no diretório
         arquivo.save(arquivo_caminho)
 
-        # Armazena os metadados do arquivo
-        metadado_arquivo_importado[nome_unico] = {
-            'nome_original': arquivo_nome,                          # Armazena o nome original
-            'data_importado': datetime.datetime.now().isoformat(),  # Data de importação
-            'user_id': user_id                                      # E quem importou
-        }
-        salvar_metadados(metadado_arquivo_importado)
+        data = datetime.datetime.now().isoformat()
 
-        print(f"Arquivo {arquivo_nome} salvo com ID único {nome_unico} para o usuário {user_id}")
+        # Armazena os metadados do arquivo
+        salvar_metadados(id_file, original_name, data, user_id)
+
+        print(f"Arquivo {original_name} salvo com ID único {id_file} para o usuário {user_id}")
 
         # Por enquanto, retorna o user_id para o frontend
         # pois, não há autenticação de fato
         return jsonify({
-            'mensagem': f'Arquivo {arquivo_nome} enviado e salvo com sucesso!',
-            'arquivo_importado': nome_unico,
+            'mensagem': f'Arquivo {original_name} enviado e salvo com sucesso!',
+            'arquivo_importado': id_file,
             'user_id': user_id
         }), 200
 
@@ -99,19 +88,21 @@ def upload():
 
 
 # Rota de download de arquivos
-@file_bp.route('/download/<arquivo_importado_id>', methods=['GET'])
-def download(arquivo_importado_id):
+@file_bp.route('/download/<id_file>', methods=['GET'])
+def download(id_file):
     try:
         # Pega o user_id da sessão
         user_id = session.get('user_id')
         if not user_id:
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."})
 
+        metadado_arquivo_importado = carregar_metadados(user_id)
+
         # Verifica se o arquivo existe e se o usuário é o proprietário
-        if arquivo_importado_id not in metadado_arquivo_importado:
-            return jsonify({'mensagem': 'Arquivo não encontrado.'}), 404
-        
-        metadado_arquivo = metadado_arquivo_importado[arquivo_importado_id]
+        if id_file not in metadado_arquivo_importado:
+            return jsonify({'mensagem': 'Arquivo não encontrado.'}), 404        
+
+        metadado_arquivo = metadado_arquivo_importado[id_file]
         if not user_id or user_id != metadado_arquivo['user_id']:
             return jsonify({'mensagem': 'Acesso negado. Você não é o proprietário do arquivo.'}), 403
 
@@ -119,9 +110,9 @@ def download(arquivo_importado_id):
         # Retorna o arquivo com nome original
         return send_from_directory(
             UPLOAD_FOLDER,
-            arquivo_importado_id,
+            id_file,
             as_attachment=True,
-            download_name=metadado_arquivo['nome_original']
+            download_name=metadado_arquivo['original_name']
         )
     except Exception as error:
         print(f"Erro ao fazer download do arquivo: {error}")
@@ -141,47 +132,49 @@ def arquivos_usuario():
     if not user_id:
         return jsonify({'arquivos': arquivos})
     
-    for arquivo_id, meta in metadado_arquivo_importado.items():
+    metadado_arquivo_importado = carregar_metadados(user_id)
+    
+    for id_file, meta in metadado_arquivo_importado.items():
         if meta['user_id'] == user_id:
         	arquivos.append({
-                'id': arquivo_id, 
-                'nome': meta['nome_original'], 
-                'data': meta['data_importado']
+                'id': id_file, 
+                'nome': meta['original_name'], 
+                'data': meta['import_date']
             })
-
-    print(f"Lista de arquivos encontrada para o usuário {user_id}: {arquivos}")
+    #print(f"Lista de arquivos encontrada para o usuário {user_id}: {arquivos}")
 
     return jsonify({'arquivos': arquivos})
 
 
 # Rota para deletar algum arquivo solicitado
-@file_bp.route('/delete/<arquivo_id>', methods=['DELETE'])
-def delete(arquivo_id):
+@file_bp.route('/delete/<id_file>', methods=['DELETE'])
+def delete(id_file):
     try:
         user_id = session.get('user_id')
 
         if not user_id:
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
-        if arquivo_id not in metadado_arquivo_importado:
-            return jsonify({"mensagem": "Arquivo não encontrado."}), 404
+        metadado_arquivo_importado = carregar_metadados(user_id)
+
+        if id_file not in metadado_arquivo_importado:
+            return jsonify({"mensagem": "Arquivo não encontrado."}), 404        
 
         # Verifica se o user_id que está tentando deletar é o mesmo dos metadados do arquivo
-        metadados_arquivo = metadado_arquivo_importado[arquivo_id]
+        metadados_arquivo = metadado_arquivo_importado[id_file]
         if user_id != metadados_arquivo['user_id']:
             return jsonify({"mensagem": "Acesso negado. Você não é o proprietário do arquivo."})
 
         UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER']
-        arquivo_caminho = os.path.join(UPLOAD_FOLDER, arquivo_id)
+        arquivo_caminho = os.path.join(UPLOAD_FOLDER, id_file)
         
         # Verifica se o arquivo existe no diretório
         if os.path.exists(arquivo_caminho):
             os.remove(arquivo_caminho)  # Deletar o arquivo do diretório
             
-            del metadado_arquivo_importado[arquivo_id]  # Deleta os metadados do arquivo
-            salvar_metadados(metadado_arquivo_importado)
+            conn('DELETE', 'METADATA', 'id_file', file)  # Deleta os metadados do arquivo
 
-            print(f"Arquivo {arquivo_id} excluído com sucesso.")
+            print(f"Arquivo {id_file} excluído com sucesso.")
 
             return jsonify({"mensagem": "Arquivo excluído com sucesso."}), 200
         else:

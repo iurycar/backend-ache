@@ -20,8 +20,8 @@ load_dotenv()
 # Inicializa o FLask
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = False # True exige HTTPS
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
 # Habilita o CORS com suporte a credenciais (cookies) para permitir requesições do REACT
 CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])   
 
@@ -38,8 +38,8 @@ if not os.path.exists(UPLOAD_FOLDER):           # Verifica se existe a pasta, se
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Adiciona a API Key do Gemini nas configurações do Flask
-app.config['GOOGLE_API_KEY'] = os.environ.get("GOOGLE_API_KEY")
+# Adiciona a API Key do Gemini, usuário, senha e host do banco de dados nas configurações do Flask
+#app.config['GOOGLE_API_KEY'] = os.environ.get("GOOGLE_API_KEY")
 
 @app.route('/chat', methods=['POST'])
 def chat():
