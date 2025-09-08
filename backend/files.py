@@ -18,6 +18,7 @@ def carregar_metadados(user_id) -> 'Metadados':
     id_file=None,               # OS ARGS KEY SÃO AS COLUNAS QUE EU QUERO
     original_name=None,
     import_date=None,
+    auth_user_id=None,
     )
 
     return resultados
@@ -103,7 +104,7 @@ def download(id_file):
             return jsonify({'mensagem': 'Arquivo não encontrado.'}), 404        
 
         metadado_arquivo = metadado_arquivo_importado[id_file]
-        if not user_id or user_id != metadado_arquivo['user_id']:
+        if not user_id or user_id != metadado_arquivo['auth_user_id']:
             return jsonify({'mensagem': 'Acesso negado. Você não é o proprietário do arquivo.'}), 403
 
         UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER']
@@ -124,7 +125,6 @@ def download(id_file):
 def arquivos_usuario():
     arquivos = []
 
-    # Pega o user_id do corpo da requisição GET
     user_id = session.get('user_id')
 
     print(f"Recebendo requisição para 'arquivos_usuario'. User ID na sessão: {user_id}")
@@ -133,9 +133,9 @@ def arquivos_usuario():
         return jsonify({'arquivos': arquivos})
     
     metadado_arquivo_importado = carregar_metadados(user_id)
-    
+
     for id_file, meta in metadado_arquivo_importado.items():
-        if meta['user_id'] == user_id:
+        if meta['auth_user_id'] == user_id:
         	arquivos.append({
                 'id': id_file, 
                 'nome': meta['original_name'], 
@@ -162,7 +162,7 @@ def delete(id_file):
 
         # Verifica se o user_id que está tentando deletar é o mesmo dos metadados do arquivo
         metadados_arquivo = metadado_arquivo_importado[id_file]
-        if user_id != metadados_arquivo['user_id']:
+        if user_id != metadados_arquivo['auth_user_id']:
             return jsonify({"mensagem": "Acesso negado. Você não é o proprietário do arquivo."})
 
         UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER']
@@ -172,7 +172,7 @@ def delete(id_file):
         if os.path.exists(arquivo_caminho):
             os.remove(arquivo_caminho)  # Deletar o arquivo do diretório
             
-            conn('DELETE', 'METADATA', 'id_file', file)  # Deleta os metadados do arquivo
+            conn('DELETE', 'METADATA', 'id_file', id_file)  # Deleta os metadados do arquivo
 
             print(f"Arquivo {id_file} excluído com sucesso.")
 
