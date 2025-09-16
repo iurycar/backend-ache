@@ -34,21 +34,21 @@ O projeto é construído com as seguintes tecnologias:
 ```
 backend-aché/
 ├── backend/
-│   ├── dados/
-│   │   ├── uploads/          # Diretório para arquivos de planilha
-│   │   └── metadados.json    # Arquivo para persistência de dados
-│   ├── __init__.py           # Inicializa o pacote
-│   ├── app.py                # Ponto de entrada da aplicação
-│   ├── auth.py               # Blueprint para rotas de autenticação (login/logout)
-│   └── files.py              # Blueprint para rotas de arquivos (upload/download/delete)
+│   ├── uploads/            # Diretório para arquivos de planilha
+│   ├── __init__.py         # Inicializa o pacote
+│   ├── app.py              # Ponto de entrada da aplicação
+│   ├── auth.py             # Blueprint para rotas de autenticação (login/logout)
+│   └── files.py            # Blueprint para rotas de arquivos (upload/download/delete)
+│   └── db.py               # Lógica de comunicação com o banco de dados MySQL
+│   └── from_to_mysql.py    # Converte os dados das planilhas para o MySQL e vice-versa
 ├── chatbotV8/
-│   ├── __init__.py       # Inicializa o pacote
-│   ├── chatbot.py        # Rota e lógica de interação do chatbot
-│   ├── interpretador.py  # Lógica de interpretação da mensagem
-│   ├── organizador.py    # Lógica de comunicação com o Gemini e tratamento de panilhas
-│   └── treinar.py        # Dados para o modo padrão do chatbot
-├── .env                  # Variáveis de ambiente (sua chave secreta e API Key)
-└── requirements.txt      # Lista de dependências do Python
+│   ├── __init__.py         # Inicializa o pacote
+│   ├── chatbot.py          # Rota e lógica de interação do chatbot
+│   ├── interpretador.py    # Lógica de interpretação da mensagem
+│   ├── organizador.py      # Lógica de comunicação com o Gemini e tratamento de panilhas
+│   └── treinar.py          # Dados para o modo padrão do chatbot
+├── .env                    # Variáveis de ambiente (sua chave secreta, API Key Gemini e acesso ao MySQL)
+└── requirements.txt        # Lista de dependências do Python
 ```
 
 ## Como colocar para funcionar
@@ -72,12 +72,23 @@ Crie um arquivo chamado `.env` na pasta principal do projeto (`backend-aché`), 
 ```
 FLASK_SECRET_KEY="SUA_CHAVE_SECRETA_AQUI"
 GOOGLE_API_KEY="SUA_CHAVE_GEMINI_AQUI"
+USER_DB="NOME_DE_USUARIO_DO_BANCO_DE_DADOS"
+PASSWORD_DB="SENHA_DO_BANCO_DE_DADOS"
+HOST_DB="HOST_DO_BANCO_DE_DADOS"
+PORT_DB="0000"
+DATABASE="NOME_DO_BANCO_DE_DADOS"
 ```
 
 * **FLASK_SECRET_KEY:** Uma chave de sessão segura. Você pode adicionar qualquer valor aleatório.
 * **GOOGLE_API_KEY:** A chave da API do Gemini, pode ser criada em [Google AI Studio](https://aistudio.google.com/app/apikey).
+* **DEMAIS VARIÁVEIS:** É necessário fazer download e configurar o MySQL. Disponível em: [MySQL Download](https://www.mysql.com/downloads/).
 
-### 4. Executar o servidor
+### 4. Configurar o MySQL
+Na pasta `database` está o arquivo `TABELAS_ACHÉ-MySQL.sql` com os comandos para criar um banco de dados `ache_db` que armazena as informações dos usuários e os dados das planilhas importadas.
+
+![Diagrama](/assets/Database.jpg)
+
+### 5. Executar o servidor
 Navegue até o diretório do projeto
 ```
 cd D:\...\backend-aché\
