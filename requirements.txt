@@ -4,3 +4,4 @@ Flask-Cors
 google-generativeai
 pandas
 mysql-connector-python
+sqlalchemy mysql-connector-python

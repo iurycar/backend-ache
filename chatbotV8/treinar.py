@@ -76,7 +76,7 @@ def treinar():
 
             with open(caminho_termo, "a", encoding="utf-8") as saida:
                 while True:
-                    palavra = str(input(f"\nInforme a palavra chave para a demanda {demanda} (Digite '0' para encerrar): "))
+                    palavra = str(input(f"\nInforme a palavra chave para a demanda '{demanda}' (Digite '0' para encerrar): "))
 
                     if palavra == '0':
                         break

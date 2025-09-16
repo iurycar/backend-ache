@@ -33,3 +33,5 @@ não estou entendendo :: ajude_me
 não consigo encontrar :: ajude_me
 preciso de auxilio :: ajude_me
 não acho a opção :: ajude_me
+até mais :: tchau
+tchau :: tchau
