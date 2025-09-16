@@ -1,10 +1,11 @@
 import google.generativeai as genai
 from pathlib import Path
+from backend.from_to_mysql import from_mysql_extrair
 import pandas as pd
 import os
 
-diretorio = Path(__file__).parent
-caminho_arquivos = diretorio / "dados" / "uploads"
+diretorio = Path(__file__).resolve().parent.parent
+caminho_arquivos = diretorio / "backend" /"uploads"
 
 # Configurar a API do Gemini
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
@@ -28,9 +29,17 @@ def organizar(processo, usuario, *args):
         case _:
             return "Desculpe, não sei como lidar com essa solicitação."
 
-def pesquisar(buscando):
+def pesquisar(id_file, search=None):
     # Pesquisar em qual arquivo está uma palavra chave
-    return f"Pesquisando '{buscando}' no arquivo..."
+    #path_file = caminho_arquivos / id_file
+
+    #from_mysql_extrair(id_file)
+
+    #tabela = pd.read_excel(path_file)
+
+    #print(tabela)
+
+    return f"Pesquisando '{search}' no arquivo..."
 
 def filtrar(filtro):
     # Filtrar palavras chaves nas planilhas
@@ -50,3 +59,8 @@ def chat_avancado(mensagem):
         return resposta.text
     except Exception as error:
         return f"Desculpe, ocorreu um erro de comunicação: {error}"
+
+if __name__ == '__main__':
+    id_file = '7e93132d-e9cd-405a-ab0b-540eec0b6802.xlsx'
+    search = 'Estabelecer requisitos de shelf life'
+    pesquisar(id_file, search)

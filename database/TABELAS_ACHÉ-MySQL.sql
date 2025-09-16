@@ -1,13 +1,17 @@
 create database if not exists `ache_db`;
 use `ache_db`;
 
-create table AUTH (
+drop table if exists `sheet`;
+drop table if exists `metadata`;
+drop table if exists `AUTH`;
+
+create table `AUTH` (
 			`user_id`		varchar(40)		not null,
             `email`			varchar(100)	not null unique,
             `password_hash`	varchar(255)	not null,
             `name`			varchar(30)		not null,
             `last_name`		varchar(60)		not null,
-            `role`			varchar(255)	not null,
+            `role`			varchar(20)		not null,
             primary key(`user_id`)
 );
 describe `AUTH`;
@@ -28,17 +32,18 @@ references `auth` (`user_id`);
 describe `metadata`;
 
 create table `sheet` (
-			`id_sheet`			varchar(40)		not null,
-            `class`				varchar(25)		not null,
+			`num`				varchar(4)		not null,
+            `classe`			varchar(25)		not null,
             `category`			varchar(25)		not null,
-            `fase`				varchar(25)		not null,
-            `condition`			varchar(6)		not null,
-            `name`				varchar(50)		not null,
-            `duration`			smallint		not null,
-            `text`				smallint		not null,
-            `reference`			smallint		not null,
+            `phase`				varchar(25)		not null,
+            `status`			varchar(6)		not null,
+            `name`				varchar(255)	not null,
+            `duration`			varchar(12)		not null,
+            `text`				varchar(12)		not null,
+            `reference`			varchar(12)		not null,
+            `conclusion`		double			not null,
             `METADATA_id_file`	varchar(50)		not null,
-            primary key(`id_sheet`)
+            primary key(`num`)
 );
 
 alter table `sheet`

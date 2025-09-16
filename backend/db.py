@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, session
+from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from pathlib import Path
 import mysql.connector
@@ -17,12 +18,8 @@ host = os.environ.get("HOST_DB")
 port = os.environ.get("PORT_DB")
 database = os.environ.get("DATABASE")
 
-print()
-print(f"Usuário: {user}")
-#print(f"Senha: {password}")
-print(f"Host: {host}")
-print(f"Nome do DB: {database}")
-print()
+db_url = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
+engine = create_engine(db_url)
 
 class Database:
     def __init__(self):
@@ -38,12 +35,12 @@ def conn(tipo, tabela, *where, **colunas_dados):
             port=port,
             database=database
         )
-        print("\nConexão com o banco de dados MySQL estabelecida com sucesso!")
+        #print("\nConexão com o banco de dados MySQL estabelecida com sucesso!")
 
         tabela = tabela.upper()
 
         cursor = connection.cursor(dictionary=True) # Cria um cursor
-        request_sql = "" # Armazena a string para consultar o banco de dados
+        sql_query = "" # Armazena a string para consultar o banco de dados
         
         match tipo:
             case "INSERT":
@@ -51,18 +48,20 @@ def conn(tipo, tabela, *where, **colunas_dados):
                 # (1, 'adasd', ...)
                 dados = tuple(colunas_dados.values())
 
-                colunas = ", ".join(colunas_dados.keys())
+                colunas_list = []
+                for chave in colunas_dados.keys():
+                    colunas_list.append(f"`{chave}`")
+
+                colunas = ", ".join(colunas_list)
                 placeholders = ", ".join(["%s"] * len(colunas_dados))  
                 #print(f"Placeholders: {placeholders}")
-                print(f"Valores inseridos: {dados}")
+                #print(f"Valores inseridos: {dados}")
 
-                request_sql = f"INSERT INTO {tabela} ({colunas}) VALUES ({placeholders})"
-                
-                
+                sql_query = f"INSERT INTO `{tabela}` ({colunas}) VALUES ({placeholders})"
 
-                cursor.execute(request_sql, dados) # Executa a solicitação no banco de dados
+                cursor.execute(sql_query, dados) # Executa a solicitação no banco de dados
                 connection.commit() # Commita as inserções
-                print("INSERT bem-sucedido!")
+                print(f"INSERT em {tabela} bem-sucedido!")
                 
             case "SELECT":
                 """SELECIONAR OS DADOS PARA AUTENTICAÇÃO
@@ -70,8 +69,12 @@ def conn(tipo, tabela, *where, **colunas_dados):
 
                 colunas = ", ".join(colunas_dados.keys())
 
-                request_sql = f"SELECT {colunas} FROM {tabela} WHERE {where[0]} = %s"
-                cursor.execute(request_sql, (where[1],))
+                sql_query = f"SELECT {colunas} FROM {tabela} WHERE {where[0]} = %s"
+                
+                if tabela == "SHEET":
+                    sql_query = f"SELECT * FROM {tabela} WHERE {where[0]} = %s"
+
+                cursor.execute(sql_query, (where[1],))
 
                 resultados = {}
 
@@ -95,6 +98,10 @@ def conn(tipo, tabela, *where, **colunas_dados):
                             #print(f"\nConsulta: {consulta}")  
                             #print(f"\nResultado: {resultados}")
                 
+                elif tabela == "SHEET":
+                    consulta_resultados = cursor.fetchall()
+                    return consulta_resultados
+                
                 #print(f"Resultado: {resultados}")
 
                 return resultados
@@ -102,15 +109,15 @@ def conn(tipo, tabela, *where, **colunas_dados):
             case "UPDATE":
                 pass
             case "DELETE":
-                request_sql = f"DELETE FROM {tabela} WHERE {where[0]} = %s"
-                cursor.execute(request_sql, (where[1],))
+                sql_query = f"DELETE FROM {tabela} WHERE {where[0]} = %s"
+                cursor.execute(sql_query, (where[1],))
                 connection.commit()
-                print("DELETE bem-sucedido!")
+                print(f"DELETE {tabela} : {where[1]} bem-sucedido!")
 
-        #print(f"Requisição: {request_sql}")
+        #print(f"Requisição: {sql_query}")
         #print(f"{cursor.rowcount} linha(s) modificada(s).")
 
-    except oracledb.Error as error:
+    except Exception as error:
         print(f"Erro ao conectar ao banco de dados MySQL: {error}")
         # Caso tenha uma conexão com o banco de dados, dá rollback para não afetar os dados
         if connection:
@@ -120,7 +127,7 @@ def conn(tipo, tabela, *where, **colunas_dados):
             cursor.close()
         if connection:
             connection.close()
-        print(f"Conexão encerrada.")
+        #print(f"Conexão encerrada.")
 
 
 if __name__ == "__main__":
@@ -142,15 +149,15 @@ if __name__ == "__main__":
     last_name=None,
     role=None)
     
-    print(f"\nResultado da consulta AUTH: {auth_data}\n")"""
+    print(f"\nResultado da consulta AUTH: {auth_data}\n")
 
     conn("DELETE", "METADATA", '1', '1')
 
-    """conn("INSERT", "METADATA", 
+    conn("INSERT", "METADATA", 
     id_file='a90f460d-b8f6-4a5c-978e-45513cfae20b',
     original_name='Desafio_Numero_1_Projeto_8_-_Exportado.xlsx',
     import_date='2025-09-06T23:07:08.056656',
-    AUTH_user_id='806443c5-9271-464a-a1da-4581c7f766e4')"""
+    AUTH_user_id='806443c5-9271-464a-a1da-4581c7f766e4')
 
     print("")
     
@@ -162,4 +169,7 @@ if __name__ == "__main__":
     auth_user_id=None
     )
 
-    print(f"\nResultado da consulta METADATA: {metadata_data}\n")
+    print(f"\nResultado da consulta METADATA: {metadata_data}\n")"""
+
+    sheet_data = conn("SELECT", "SHEET")
+    print(sheet_data)

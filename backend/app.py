@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, session, send_from_directory
 from chatbotV8.interpretador import interpretar
 #from chatbotV8.chatbot import chatbot_bp
 from dotenv import load_dotenv
+from datetime import timedelta
 from flask_cors import CORS
 from .files import file_bp
 from .auth import auth_bp
@@ -22,6 +23,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 # Habilita o CORS com suporte a credenciais (cookies) para permitir requesições do REACT
 CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])   
 
@@ -32,7 +34,7 @@ app.register_blueprint(file_bp, url_prefix='/')
 
 # Configura o diretório para armazenar os arquivos importados
 diretorio = Path(__file__).parent
-upload_pasta = diretorio / "dados" / "uploads"
+upload_pasta = diretorio / "uploads"
 UPLOAD_FOLDER = upload_pasta                    # Diretório da pasta que armazena os arquivos
 if not os.path.exists(UPLOAD_FOLDER):           # Verifica se existe a pasta, se não cria ela
     os.makedirs(UPLOAD_FOLDER)

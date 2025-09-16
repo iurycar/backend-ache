@@ -1,8 +1,7 @@
 # API imports
 from flask import Blueprint, request, jsonify, session
-from .db import conn
 from pathlib import Path
-import os
+from .db import conn
 
 """
     Esse arquivo é responsável por criar as rotas e os meios de autenticação
@@ -38,8 +37,9 @@ def login():
         session['user_name'] = user_dados['name']
         session['user_last_name'] = user_dados['last_name']
         session['user_role'] = user_dados['role']
-        print(f"Login bem-sucedido para o usuário: {user_dados['user_id']}")
+        session.permanent = True
 
+        print(f"Login bem-sucedido para o usuário: {user_dados['user_id']}")
         return jsonify({
             "mensagem": "Login bem-sucedido",
             "user": {
@@ -58,7 +58,7 @@ def login():
 @auth_bp.route('/status', methods=['GET'])
 def status():
     user_id = session.get('user_id')
-    print(user_id)
+    
     if user_id:
         return jsonify({
             "isAuthenticated": True,
