@@ -202,8 +202,8 @@ def arquivos_usuario():
 
 
 
-@file_bp.route('/all-tasks-data', methods=['GET'])
-def all_tasks_data():
+@file_bp.route('/arquivo/<id_file>/dados', methods=['GET'])
+def dados(id_file):
     try:
         user_id = session.get('user_id')
         if not user_id:
@@ -214,16 +214,22 @@ def all_tasks_data():
         if not metadado_arquivo_importado:
             return jsonify({"all_tasks": []}), 200
 
-        all_tasks = []
-        for id_file, metadado in metadado_arquivo_importado.items():
-            tasks_from_file = conn('SELECT', 'SHEET', 'METADATA_id_file', id_file)
-            
-            if tasks_from_file:
-                for task in tasks_from_file:
-                    task['spreadsheetName'] = metadado.get('original_name', 'Nome não encontrado')
-                all_tasks.extend(tasks_from_file)
+        dados = conn('SELECT', 'SHEET', 'METADATA_id_file', id_file,
+            num=None,
+            classe=None,
+            category=None,
+            phase=None,
+            status=None,
+            name=None,
+            duration=None,
+            text=None,
+            reference=None,
+            conclusion=None
+        )
 
-        return jsonify({"all_tasks": all_tasks}), 200
+        print(f"Buscando dados do arquivo '{id_file}'.")
+
+        return jsonify({'dados': dados}), 200
 
     except Exception as error:
         print(f"Erro ao buscar todas as tarefas: {error}")

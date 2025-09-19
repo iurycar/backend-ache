@@ -70,9 +70,6 @@ def conn(tipo, tabela, *where, **colunas_dados):
                 colunas = ", ".join(colunas_dados.keys())
 
                 sql_query = f"SELECT {colunas} FROM {tabela} WHERE {where[0]} = %s"
-                
-                if tabela == "SHEET":
-                    sql_query = f"SELECT * FROM {tabela} WHERE {where[0]} = %s"
 
                 cursor.execute(sql_query, (where[1],))
 
@@ -169,7 +166,18 @@ if __name__ == "__main__":
     auth_user_id=None
     )
 
-    print(f"\nResultado da consulta METADATA: {metadata_data}\n")"""
+    print(f"\nResultado da consulta METADATA: {metadata_data}\n")
 
-    sheet_data = conn("SELECT", "SHEET")
-    print(sheet_data)
+    id_file = 'bd01523e-d4fd-47f8-9a07-cae35366b15f.xlsx'
+    sheet_data = conn('SELECT', 'SHEET', 'METADATA_id_file', id_file,
+    num=None,
+    classe=None,
+    category=None,
+    phase=None,
+    status=None,
+    name=None,
+    duration=None,
+    text=None,
+    reference=None,
+    conclusion=None)
+    print(sheet_data)"""
