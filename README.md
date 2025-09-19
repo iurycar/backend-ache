@@ -30,6 +30,7 @@ O projeto é construído com as seguintes tecnologias:
 * **google-generativeai:** SDK oficial do Google para interagir com a API do Gemini.
 * **pandas:** Biblioteca de manipulação e análise de dados, ideal para trabalhar com arquivos de panilha.
 * **UUID:** Para a criação de identificadores únicos para os arquivos e os usuários.
+* **MySQL:** É um banco de dados relacional, usado para organizar as informações em tabelas.
 
 ```
 backend-aché/
