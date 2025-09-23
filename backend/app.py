@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, session, send_from_directory
-from chatbotV8.interpretador import interpretar
-#from chatbotV8.chatbot import chatbot_bp
+from chatbotV8.chatbot import chatbot_bp
 from dotenv import load_dotenv
 from datetime import timedelta
 from flask_cors import CORS
@@ -30,7 +29,7 @@ CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://1
 # Registra o Blueprint
 app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(file_bp, url_prefix='/')
-#app.register_blueprint(chatbot_bp, url_prefix='/')
+app.register_blueprint(chatbot_bp, url_prefix='/')
 
 # Configura o diretório para armazenar os arquivos importados
 diretorio = Path(__file__).parent
@@ -39,40 +38,6 @@ UPLOAD_FOLDER = upload_pasta                    # Diretório da pasta que armaze
 if not os.path.exists(UPLOAD_FOLDER):           # Verifica se existe a pasta, se não cria ela
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Adiciona a API Key do Gemini, usuário, senha e host do banco de dados nas configurações do Flask
-#app.config['GOOGLE_API_KEY'] = os.environ.get("GOOGLE_API_KEY")
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    try:
-        # Recebe a mensagem do JSON enviado pelo React
-        dado = request.json
-
-        if not dado or 'mensagem' not in dado:
-            return jsonify({'resposta': 'Por favor, forneça uma mensagem na requisição'})
-
-        mensagem = dado.get('mensagem', '')
-        usuario = session.get('user_name', 'Convidado')
-        modo_chat = session.get('modo_chat', 'standard')
-
-        #print(f"Modo da sessão ATUAL: '{modo_chat}'")
-
-        # Envia a mensagem e o modo do chat para o interpretador
-        resposta_chatbot, proximo_modo_chat = interpretar(mensagem, usuario, modo_chat)
-
-        #print(f"Próximo modo retornado: '{proximo_modo_chat}'")
-
-        # O modo de chat da sessão é atualizado para a próxima interação
-        session['modo_chat'] = proximo_modo_chat
-        session.modified = True
-        print(f"Modo da sessão SALVO: '{session['modo_chat']}'\n")
-
-        return jsonify({'resposta': resposta_chatbot, 'modo_chat': proximo_modo_chat})
-
-    except Exception as error:
-        print(f"Erro na requisição: {error}")
-        return jsonify({'resposta': 'Ocorreu um erro no servidor. Tente novamente mais tarde.'})
 
 if __name__ == "__main__":
     app.run(debug=True)

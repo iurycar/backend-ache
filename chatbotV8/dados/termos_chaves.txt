@@ -35,3 +35,13 @@ preciso de auxilio :: ajude_me
 não acho a opção :: ajude_me
 até mais :: tchau
 tchau :: tchau
+adicionar nova tarefa :: adicionar_tarefa
+criar nova tarefa :: adicionar_tarefa
+criar uma nova tarefa :: adicionar_tarefa
+adicionar uma nova tarefa :: adicionar_tarefa
+adicionar a tarefa :: adicionar_tarefa
+criar a tarefa :: adicionar_tarefa
+implemente nova tarefa :: adicionar_tarefa
+implemente uma nova tarefa :: adicionar_tarefa
+implemente a tarefa :: adicionar_tarefa
+adicionar tarefa :: adicionar_tarefa

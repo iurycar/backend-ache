@@ -5,3 +5,4 @@ google-generativeai
 pandas
 mysql-connector-python
 sqlalchemy mysql-connector-python
+bcrypt

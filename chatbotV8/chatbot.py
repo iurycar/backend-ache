@@ -3,10 +3,6 @@ from .interpretador import interpretar
 
 """
     Esse arquivo é responsável por lidar com as requisições de mensagens para a Melora
-
-    Por algum motivo divino, o blueprint não está funcionando corretamente com o chatbot
-    o problema está que o chatbot persiste no modo avançado mesmo quando não deve
-    então a rota do chatbot deve ser aplicada diretamente no app.py
 """
 
 chatbot_bp = Blueprint('chatbot_bp', __name__)

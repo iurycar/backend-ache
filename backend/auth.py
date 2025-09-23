@@ -1,19 +1,20 @@
-# API imports
 from flask import Blueprint, request, jsonify, session
+from .hashing import checkPassword
+from .db import consultaSQL
 from pathlib import Path
-from .db import conn
 
 """
     Esse arquivo é responsável por criar as rotas e os meios de autenticação
 """
 
-def consulta_db(email):
-    resultado = conn("SELECT", "AUTH", 'email', email,
+def consulta_db(email: str) -> dict | None:
+    resultado = consultaSQL("SELECT", "EMPLOYEE", 'email', email,
     user_id=None,
     password_hash=None,
     name=None,
     last_name=None,
-    role=None)
+    role=None,
+    id_team=None)
 
     return resultado
 
@@ -24,26 +25,29 @@ auth_bp = Blueprint('auth_bp', __name__)
 @auth_bp.route("/login", methods=['POST'])
 def login():
     dados = request.json
-    email = dados.get('email')
-    password = dados.get('password')
+    email: str = dados.get('email')
+    password: str = dados.get('password')
 
-    users_db = consulta_db(email)
+    users_db: dict = consulta_db(email)   # Consulta o banco de dados pelo email
 
-    user_dados = users_db.get(email)
+    user_dados: str = users_db.get(email)   # Verifica se o email existe no banco de dados
 
-    if user_dados and user_dados['password_hash'] == password:
+    # Verifica se a senha está correta
+    same = checkPassword(password, user_dados['password_hash'])
+
+    if user_dados and same:
         session['user_id'] = user_dados['user_id']
         session['user_email'] = email
         session['user_name'] = user_dados['name']
         session['user_last_name'] = user_dados['last_name']
         session['user_role'] = user_dados['role']
+        session['user_team'] = user_dados['id_team']
         session.permanent = True
 
         print(f"Login bem-sucedido para o usuário: {user_dados['user_id']}")
         return jsonify({
             "mensagem": "Login bem-sucedido",
             "user": {
-                "id": user_dados['user_id'],
                 "name": user_dados['name'],
                 "email": email,
                 "role": user_dados['role'],
@@ -63,7 +67,6 @@ def status():
         return jsonify({
             "isAuthenticated": True,
             "user": {
-                "id": user_id,
                 "name": session.get('user_name'),
                 "email": session.get('user_email'),
                 "role": session.get('user_role')
@@ -76,6 +79,8 @@ def status():
 def logout():
     session.pop('user_id', None)
     session.pop('user_name', None)
+    session.pop('user_last_name', None)
     session.pop('user_email', None)
     session.pop('user_role', None)
+    session.pop('user_team', None)
     return jsonify({"mensagem": "Logout bem-sucedido"}), 200

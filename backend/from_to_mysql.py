@@ -1,18 +1,26 @@
-from .db import conn, engine
+from .db import consultaSQL, ENGINE
+from string import Template
 from pathlib import Path
 import pandas as pd
 
 diretorio = Path(__file__).parent
 path = diretorio / "uploads" 
 
-def to_mysql_inserir(id_file):
+def to_mysql_inserir(id_file: str) -> None:
     try:
         file_path = path / id_file
-    
+
+        # Verifica se o arquivo existe antes de tentar inserir
+        if not file_path.exists():
+            print(f"Erro: O arquivo {file_path} não foi encontrado.")
+            return
+
         sheet = pd.read_excel(file_path)
 
-        sheet['METADATA_id_file'] = id_file
+        # Adiciona o id_file como uma coluna
+        sheet['id_file'] = id_file
 
+        # Renomeia as colunas para corresponder ao banco de dados
         sheet.rename(columns={
             'Número': 'num',
             'Classificação': 'classe',
@@ -29,17 +37,17 @@ def to_mysql_inserir(id_file):
         print("Iniciando a inserção na tabela SHEET...")
         sheet.to_sql(
             'sheet',
-            con=engine,
+            con=ENGINE,
             if_exists='append',
             index=False
         )
         
         print(f"Dados inseridos com sucesso na tabela SHEET.")
     except Exception as error:
-        print(f"Erro ao inserir os dados do arquivo para o MySQL: {error}")
+        print(f"Erro ao inserir os dados do arquivo {id_file} para o MySQL: {error}")
 
 
-def from_mysql_extrair(id_file):
+def from_mysql_extrair(id_file:str) -> None:
     try:
         file_path = path / id_file
 
@@ -54,14 +62,15 @@ def from_mysql_extrair(id_file):
             'text': 'Como Fazer',
             'reference': 'Documento Referência',
             'conclusion': '% Concluída',
-            'METADATA_id_file': 'ID do Arquivo'
         }
 
-        sql_query = f"SELECT `num`,`classe`,`category`,`phase`,`status`,`name`,`duration`,`text`,`reference`,`conclusion` FROM `sheet` WHERE `METADATA_id_file` = '{id_file}'"
+        # Consulta SQL para buscar os dados na tabela SHEET com base no id_file
+        template_sql_query = Template("SELECT `num`,`classe`,`category`,`phase`,`status`,`name`,`duration`,`text`,`reference`,`conclusion` FROM `sheet` WHERE `id_file` = '$id_file'")
+        sql_query = template_sql_query.safe_substitute(id_file=id_file)
 
         print(f"Buscando dados na tabela SHEET para o arquivo '{id_file}'.")
 
-        sheet = pd.read_sql(sql_query, con=engine)
+        sheet = pd.read_sql(sql_query, con=ENGINE)
 
         if sheet.empty:
             print("Nenhum dado encontrado para o arquivo solicitado.")
@@ -86,4 +95,3 @@ if __name__ == '__main__':
     """to_mysql_inserir(id_file, filename, user_id)"""
 
     from_mysql_extrair(id_file)
-        
