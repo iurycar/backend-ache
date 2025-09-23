@@ -1,11 +1,12 @@
 from flask import Blueprint, request, jsonify, session, send_from_directory, current_app
 from .from_to_mysql import to_mysql_inserir, from_mysql_extrair
 from werkzeug.utils import secure_filename
+from .db import consultaSQL
 from pathlib import Path
-from .db import conn
 import datetime
 import uuid
 import json
+import re
 import os
 
 """
@@ -15,23 +16,24 @@ import os
 
 diretorio = Path(__file__).parent
 
-def load_metadata(user_id) -> 'Metadados':
-    resultados = conn('SELECT', 'METADATA', 
-        'auth_user_id', user_id,    # SELECIONA ONDE (WHERE) AUTH_USER_ID = USER_ID
+def load_metadata(id_team: str) -> "Dados do projeto":
+    resultados = consultaSQL('SELECT', 'PROJECT', 
+        'id_team', id_team,         # SELECIONA ONDE (WHERE) ID_TEAM = ID_TEAM
         id_file=None,               # OS ARGS KEY SÃO AS COLUNAS QUE EU QUERO QUE RETORNE
         original_name=None,
         import_date=None,
-        auth_user_id=None,
+        project_name=None,
+        id_team=None,
     )
-
     return resultados
 
-def save_metadata(id_file, filename, timestamp, user_id):
-    conn('INSERT', 'METADATA', 
+def save_metadata(id_file: str, filename: str, timestamp: str, id_team: str, project_name: str) -> None:
+    consultaSQL('INSERT', 'PROJECT', 
         id_file=id_file, 
         original_name=filename, 
-        import_date=timestamp, 
-        auth_user_id=user_id
+        import_date=timestamp,
+        project_name=project_name, 
+        id_team=id_team,
     )
 
 # Criação do Blueprint/Projeto da aplicação de upload/download de arquivos
@@ -45,7 +47,9 @@ def upload():
     try:
         # O ID servirá para garantir que não haja conflito entre as requisições dos usuários
         user_id = session.get('user_id')
-        if not user_id:
+        id_team = session.get('user_team')
+
+        if not user_id or not id_team:
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."})
 
         # Verifica se tem algum arquivo na requisição
@@ -76,20 +80,28 @@ def upload():
         # Pega a data e horário
         data = datetime.datetime.now().isoformat()
 
+        # Exemplo nome do projeto 'Projeto 1' em "Desafio Número 1_Projeto 1 - Exportado.xlsx"
+        project_name_pattern = r'Projeto\s+([^-_]+)'  # Padrão regex para capturar o nome do projeto
+        match = re.search(project_name_pattern, arquivo.filename) # Procura o padrão no nome do arquivo
+        project_name = match.group(1) if match else "Projeto Sem Nome"
+
         # Armazena os metadados do arquivo
-        save_metadata(id_file, original_name, data, user_id)
+        save_metadata(id_file, original_name, data, id_team, project_name)
+
+        # Verifica se o id_file foi salvo corretamente no banco de dados
+        project_metadata = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file, id_file=None)
+        if not project_metadata:
+            print(f"Erro: Metadados do arquivo {id_file} não foram salvos no banco de dados.")
+            return jsonify({'mensagem': 'Erro ao salvar os metadados do arquivo.'}), 500
 
         # Manda os dados da tabela para o MySQL
         to_mysql_inserir(id_file)
 
         print(f"Arquivo {original_name} salvo com ID único {id_file} para o usuário {user_id}")
 
-        # Por enquanto, retorna o user_id para o frontend
-        # pois, não há autenticação de fato
         return jsonify({
             'mensagem': f'Arquivo {original_name} enviado e salvo com sucesso!',
             'arquivo_importado': id_file,
-            'user_id': user_id
         }), 200
 
     except Exception as error:
@@ -100,22 +112,25 @@ def upload():
 
 # Rota de download de arquivos
 @file_bp.route('/download/<id_file>', methods=['GET'])
-def download(id_file):
+def download(id_file: str):
     try:
         # Pega o user_id da sessão
         user_id = session.get('user_id')
-        if not user_id:
+        id_team = session.get('user_team')
+
+        if not user_id or not id_team:
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."})
 
-        metadado_arquivo_importado = load_metadata(user_id)
+        metadado_arquivo_importado = load_metadata(id_team)
 
         # Verifica se o arquivo existe e se o usuário é o proprietário
         if id_file not in metadado_arquivo_importado:
             return jsonify({'mensagem': 'Arquivo não encontrado.'}), 404        
 
+        # Verifica se o usuário faz parte da equipe proprietária do arquivo
         metadado_arquivo = metadado_arquivo_importado[id_file]
-        if not user_id or user_id != metadado_arquivo['auth_user_id']:
-            return jsonify({'mensagem': 'Acesso negado. Você não é o proprietário do arquivo.'}), 403
+        if id_team != metadado_arquivo['id_team']:
+            return jsonify({'mensagem': 'Acesso negado'}), 403
 
         # Extrai os dados do MySQL e coloca na panilha original 
         from_mysql_extrair(id_file)
@@ -136,21 +151,22 @@ def download(id_file):
 
 # Rota para deletar algum arquivo solicitado
 @file_bp.route('/delete/<id_file>', methods=['DELETE'])
-def delete(id_file):
+def delete(id_file: str):
     try:
         user_id = session.get('user_id')
+        id_team = session.get('user_team')
 
-        if not user_id:
+        if not user_id or not id_team:
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
-        metadado_arquivo_importado = load_metadata(user_id)
+        metadado_arquivo_importado = load_metadata(id_team)
 
         if id_file not in metadado_arquivo_importado:
             return jsonify({"mensagem": "Arquivo não encontrado."}), 404        
 
-        # Verifica se o user_id que está tentando deletar é o mesmo dos metadados do arquivo
+        # Verifica se o usuário faz parte da equipe proprietária do arquivo
         metadados_arquivo = metadado_arquivo_importado[id_file]
-        if user_id != metadados_arquivo['auth_user_id']:
+        if id_team != metadados_arquivo['id_team']:
             return jsonify({"mensagem": "Acesso negado. Você não é o proprietário do arquivo."})
 
         UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER']
@@ -160,8 +176,8 @@ def delete(id_file):
         if os.path.exists(arquivo_caminho):
             os.remove(arquivo_caminho)  # Deleta o arquivo do diretório
             
-            conn('DELETE', 'SHEET', 'METADATA_id_file', id_file) # Deleta todas as linhas com a mesma FK
-            conn('DELETE', 'METADATA', 'id_file', id_file)  # Deleta os metadados do arquivo
+            consultaSQL('DELETE', 'SHEET', 'id_file', id_file) # Deleta todas as linhas com a mesma FK
+            consultaSQL('DELETE', 'PROJECT', 'id_file', id_file)  # Deleta os metadados do arquivo
 
             print(f"Arquivo {id_file} excluído com sucesso.")
 
@@ -178,19 +194,24 @@ def delete(id_file):
 # Rota para solicitar os arquivos do usuário
 @file_bp.route('/arquivos_usuario', methods=['GET'])
 def arquivos_usuario():
-    arquivos = []
+    arquivos: list[dict] = []
 
     user_id = session.get('user_id')
+    id_team = session.get('user_team')
 
     print(f"Recebendo requisição para 'arquivos_usuario'. User ID na sessão: {user_id}")
 
     if not user_id:
         return jsonify({'arquivos': arquivos})
     
-    metadado_arquivo_importado = load_metadata(user_id)
+    metadado_arquivo_importado = load_metadata(id_team)
 
+    if not metadado_arquivo_importado:
+        print(f"Nenhum arquivo encontrado para o usuário {user_id}.")
+        return jsonify({'arquivos': arquivos})
+    
     for id_file, meta in metadado_arquivo_importado.items():
-        if meta['auth_user_id'] == user_id:
+        if meta['id_team'] == id_team:
         	arquivos.append({
                 'id': id_file, 
                 'name': meta['original_name'], 
@@ -209,12 +230,7 @@ def dados(id_file):
         if not user_id:
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        
-        metadado_arquivo_importado = load_metadata(user_id)
-        if not metadado_arquivo_importado:
-            return jsonify({"all_tasks": []}), 200
-
-        dados = conn('SELECT', 'SHEET', 'METADATA_id_file', id_file,
+        dados = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
             num=None,
             classe=None,
             category=None,
@@ -227,11 +243,10 @@ def dados(id_file):
             conclusion=None
         )
 
-        print(f"Buscando dados do arquivo '{id_file}'.")
+        if not dados:
+            return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
 
         return jsonify({'dados': dados}), 200
 
     except Exception as error:
         print(f"Erro ao buscar todas as tarefas: {error}")
-        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
-    

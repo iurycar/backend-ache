@@ -6,7 +6,7 @@ from .treinar import termos_chaves, respostas_termos
     Esse arquivo lida com a interpretação das mensagens do usuário e a construção da respostas
 """
 
-def interpretar(mensagem, usuario, modo_chat):
+def interpretar(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str]:
     mensagem = mensagem.lower()
 
     # Se já estiver em modo avançado, só desativa se a pessoa pedir "sair"
@@ -17,10 +17,9 @@ def interpretar(mensagem, usuario, modo_chat):
             resposta_gemini = chat_avancado(mensagem)
             return resposta_gemini, "avancado"  # Mantém avançado até o "sair"
 
-    # Modo standard
-    chaves = termos_chaves()
-    respostas = respostas_termos()
-    msg_chave = set()
+    chaves = termos_chaves() # Dicionário com as palavras chaves
+    respostas = respostas_termos() # Dicionário com as respostas associadas as palavras chaves
+    msg_chave = set()   # Cria um conjunto
 
     for frase_chave, termo_associado in chaves.items():
         if frase_chave in mensagem:
@@ -32,17 +31,17 @@ def interpretar(mensagem, usuario, modo_chat):
 
     # Verifica se o usuário pediu para ativar o avançado
     if 'chat_avancado' in msg_chave:
-        resposta = construir_frase(list(msg_chave), usuario, respostas)
+        resposta = construir_frase(mensagem, list(msg_chave), usuario, respostas)
         return resposta, 'avancado'  # ativa avançado para próximas interações
 
     # Resposta normal
-    resposta = construir_frase(list(msg_chave), usuario, respostas)
+    resposta = construir_frase(mensagem, list(msg_chave), usuario, respostas)
     return resposta, 'standard'
 
 
-def construir_frase(chaves, usuario, respostas):
-    trechos_resposta = [] # Armazena os trechos da resposta que foi construída
-    prefixo = " " # Adicionado no começo das resposta da Liora
+def construir_frase(mensagem: str, chaves: str, usuario: str, respostas: str) -> str:
+    trechos_resposta:list[str] = [] # Armazena os trechos da resposta que foi construída
+    prefixo: str = ' ' # Adicionado no começo das resposta da Liora
     
     # Passa por todos os termos chaves da mensagem, ex. ['cumprimentar', 'minhas_tarefas'...]
     for chave in chaves:
@@ -52,7 +51,7 @@ def construir_frase(chaves, usuario, respostas):
 
             # Verifica se a resposta para a mensagem é uma demanda/ação (int) ou um mensagem resposta (string)
             if isinstance(processo, int):
-                trecho = organizar(processo, usuario)
+                trecho = organizar(processo, mensagem, usuario)
                 trechos_resposta.append(trecho)
             elif isinstance(processo, str):
                 trechos_resposta.append(processo)

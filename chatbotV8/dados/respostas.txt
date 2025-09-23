@@ -6,3 +6,4 @@ arquivos :: 3
 pesquisar :: 4
 ajude_me :: 5
 tchau :: Até mais! 😊
+adicionar_tarefa :: 6
