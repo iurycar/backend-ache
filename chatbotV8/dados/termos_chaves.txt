@@ -45,3 +45,5 @@ implemente nova tarefa :: adicionar_tarefa
 implemente uma nova tarefa :: adicionar_tarefa
 implemente a tarefa :: adicionar_tarefa
 adicionar tarefa :: adicionar_tarefa
+adicione a tarefa :: adicionar_tarefa
+adicione tarefa :: adicionar_tarefa

@@ -83,7 +83,7 @@ def upload():
         # Exemplo nome do projeto 'Projeto 1' em "Desafio Número 1_Projeto 1 - Exportado.xlsx"
         project_name_pattern = r'Projeto\s+([^-_]+)'  # Padrão regex para capturar o nome do projeto
         match = re.search(project_name_pattern, arquivo.filename) # Procura o padrão no nome do arquivo
-        project_name = match.group(1) if match else "Projeto Sem Nome"
+        project_name = match.group(1).strip() if match else "Projeto Sem Nome"
 
         # Armazena os metadados do arquivo
         save_metadata(id_file, original_name, data, id_team, project_name)
@@ -97,6 +97,27 @@ def upload():
         # Manda os dados da tabela para o MySQL
         to_mysql_inserir(id_file)
 
+        # Atualiza start_date e end_date em lote (normalizando conclusion 0–1 ou 0–100)
+        try:
+            with ENGINE.begin() as conn:
+                conn.execute(
+                    text("""
+                        UPDATE sheet SET 
+                        start_date = CASE WHEN (start_date IS NULL OR start_date = '')
+                                AND (
+                                    CASE WHEN COALESCE(conclusion,0) > 1 THEN COALESCE(conclusion,0)/100 
+                                        ELSE COALESCE(conclusion,0) END ) > 0 THEN NOW()
+                            ELSE start_date END,
+                        end_date = CASE
+                            WHEN (end_date IS NULL OR end_date = '')
+                                AND (
+                                    CASE WHEN COALESCE(conclusion,0) > 1 THEN COALESCE(conclusion,0)/100 
+                                        ELSE COALESCE(conclusion,0) END ) >= 1 THEN NOW()
+                            ELSE end_date END 
+                        WHERE id_file = :id_file"""), {"id_file": id_file}
+                )
+        except Exception as error:
+            print(f"Falha ao atualizar start/end_date em lote: {error}")
         print(f"Arquivo {original_name} salvo com ID único {id_file} para o usuário {user_id}")
 
         return jsonify({
@@ -240,7 +261,9 @@ def dados(id_file):
             duration=None,
             text=None,
             reference=None,
-            conclusion=None
+            conclusion=None,
+            start_date=None,
+            end_date=None
         )
 
         if not dados:
@@ -250,3 +273,228 @@ def dados(id_file):
 
     except Exception as error:
         print(f"Erro ao buscar todas as tarefas: {error}")
+
+
+# Rota para atualizar uma linha da planilha
+@file_bp.route('/arquivo/<id_file>/linha/<int:num>', methods=['PATCH'])
+def atualizar_linha(id_file: str, num: int):
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if not user_id or not id_team:
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+
+        # Verifica se o arquivo pertence ao time do usuário
+        metadado_arquivo_importado = load_metadata(id_team)
+        if not metadado_arquivo_importado or id_file not in metadado_arquivo_importado:
+            return jsonify({"mensagem": "Arquivo não encontrado."}), 404
+
+        data = request.get_json(silent=True) or {} # Dados enviados na requisição
+
+        # Campos permitidos para atualização
+        permitidos = {
+            'num', 'classe', 'category', 'phase', 'status',
+            'name', 'duration', 'text', 'reference', 'conclusion'
+        }
+
+        # Filtra apenas os campos permitidos
+        update_args: dict = {}
+        for key, value in data.items():
+            if key not in permitidos:
+                return jsonify({"mensagem": f"Campo inválido para atualização: {key}"}), 400
+            else:
+                update_args[key] = value
+
+        print("Update: ", data)
+        print("Update args: ", update_args)
+
+        # Normaliza conclusion (0-1)
+        if 'conclusion' in update_args:
+            try:
+                c = float(update_args['conclusion'])
+                # aceita 0–100 e 0–1; se c>1, converte para 0–1
+                if c <= 1:
+                    update_args['conclusion'] = c
+                else:
+                    update_args['conclusion'] = min(max(c / 100, 0), 1)
+            except Exception:
+                update_args.pop('conclusion', None)
+
+        if not update_args:
+            return jsonify({"mensagem": "Nada para atualizar."}), 400
+
+        print(f"Atualizando linha {num} do arquivo {id_file} com: {update_args}")
+        
+        # Verifica se a linha existe
+        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+            id_file=None,
+            num=None
+        )
+
+        if not linha_existente:
+            num = str(consultaSQL("SELECT", "SHEET", "id_file", id_file[0], "MAX(num)") + 1)
+
+            consultaSQL('INSERT', 'SHEET',
+                id_file = id_file,
+                num = num,
+                classe = update_args.get('classe', ''),
+                category = update_args.get('category', ''),
+                phase = update_args.get('phase', ''),
+                status = update_args.get('status', '').strip().upper(),
+                name = update_args.get('name', ''),
+                duration = update_args.get('duration', ''),
+                text = update_args.get('text', ''),
+                reference = update_args.get('reference', ''),
+                conclusion = update_args.get('conclusion', 0)
+            )
+
+            return jsonify({
+                "mensagem": "Linha inserida com sucesso.",
+                "inserted": update_args
+            }), 201
+        else:
+            # Executa o UPDATE na linha alvo (chave: id_file + num atual)
+            # Observação: se 'num' estiver em update_args, ele será o NOVO valor.
+            consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, **update_args)
+
+        return jsonify({
+            "mensagem": "Linha atualizada com sucesso.",
+            "updated": update_args
+        }), 200
+
+    except Exception as error:
+        print(f"Erro ao atualizar linha: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+
+
+# Rota para deletar uma linha da planilha
+@file_bp.route('/arquivo/<id_file>/linha/<int:num>', methods=['DELETE'])
+def deletar_linha(id_file: str, num: int):
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if not user_id or not id_team:
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+
+        # Verifica se o arquivo pertence ao time do usuário
+        metadado_arquivo_importado = load_metadata(id_team)
+        if not metadado_arquivo_importado or id_file not in metadado_arquivo_importado:
+            return jsonify({"mensagem": "Arquivo não encontrado."}), 404
+
+        # Verifica se a linha existe
+        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+            id_file=None,
+            num=None
+        )
+
+        if not linha_existente:
+            return jsonify({"mensagem": "Linha não encontrada."}), 404
+
+        # Executa o DELETE na linha alvo (chave: id_file + num atual)
+        consultaSQL('DELETE', 'SHEET', 'id_file', id_file, 'num', num)
+
+        return jsonify({"mensagem": "Linha deletada com sucesso."}), 200
+
+    except Exception as error:
+        print(f"Erro ao deletar linha: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+
+
+# Rota para iniciar uma tarefa
+@file_bp.route('/arquivo/<id_file>/start/<int:num>', methods=['POST'])
+def iniciar_tarefa(id_file: str, num: int):
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if not user_id or not id_team:
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+
+        # Verifica se o arquivo pertence ao time do usuário
+        metadado_arquivo_importado = load_metadata(id_team)
+        if not metadado_arquivo_importado or id_file not in metadado_arquivo_importado:
+            return jsonify({"mensagem": "Arquivo não encontrado."}), 404
+
+        # Verifica se a linha existe
+        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+            id_file=None,
+            num=None,
+            start_date=None
+        )
+
+        if not linha_existente:
+            return jsonify({"mensagem": "Linha não encontrada."}), 404
+
+        start = linha_existente[0]['start_date']
+        if start:
+            return jsonify({"mensagem": "A tarefa já está em andamento."}), 400
+
+        data = datetime.datetime.now().isoformat()
+
+        # Atualiza o status da tarefa para "EM ANDAMENTO"
+        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=data)
+
+        return jsonify({"mensagem": "Tarefa iniciada com sucesso."}), 200
+
+    except Exception as error:
+        print(f"Erro ao iniciar tarefa: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+
+
+# Rota para desfazer o início de uma tarefa
+@file_bp.route('/arquivo/<id_file>/start/<int:num>', methods=['DELETE'])
+def desfazer_inicio_tarefa(id_file: str, num: int):
+    """Remove o start_date (volta tarefa para 'não iniciada' em termos de início)."""
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if not user_id or not id_team:
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+
+        # Verifica se o arquivo pertence ao time do usuário
+        metadado_arquivo_importado = load_metadata(id_team)
+        if not metadado_arquivo_importado or id_file not in metadado_arquivo_importado:
+            return jsonify({"mensagem": "Arquivo não encontrado."}), 404
+
+        # Verifica se a linha existe
+        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+            id_file=None,
+            num=None,
+            conclusion=None,
+            start_date=None
+        )
+
+        if not linha_existente:
+            return jsonify({"mensagem": "Linha não encontrada."}), 404
+
+        start = linha_existente[0].get('start_date')
+        if not start:
+            return jsonify({"mensagem": "A tarefa ainda não foi iniciada."}), 400
+
+        if linha_existente[0].get('conclusion', 0) == 1:
+            return jsonify({"mensagem": "A tarefa já foi concluída; não é possível desfazer o início."}), 400
+
+        # Define start_date como NULL
+        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=None, conclusion=0)
+
+        return jsonify({"mensagem": "Início da tarefa removido com sucesso."}), 200
+
+    except Exception as error:
+        print(f"Erro ao desfazer início de tarefa: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+
+
+
+@file_bp.route('/arquivo/<id_file>/add_task', methods=['POST'])
+def adicionar_tarefa(id_file: str):
+    dados = request.get_json(silent=True) or {}
+
+    user_id = session.get('user_id')
+    id_team = session.get('user_team')
+
+    if not user_id or not id_team:
+        return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+    
