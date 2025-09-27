@@ -6,6 +6,8 @@ drop table if exists `PROJECT`;
 drop table if exists `EMPLOYEE`;
 drop table if exists `TEAMS`;
 
+-- Autenticação e times
+
 create table `TEAMS` (
 			`id_team`		varchar(40)		not null,
             `team_name`		varchar(100),
@@ -30,6 +32,8 @@ foreign key(`id_team`)
 references `TEAMS` (`id_team`);
 
 describe `EMPLOYEE`;
+
+-- Projetos e Planilhas (TAREFAS)
 
 create table `PROJECT` (
 			`id_file`		varchar(50)		not null,
@@ -71,6 +75,17 @@ foreign key (`id_file`)
 references `PROJECT` (`id_file`);
 
 describe `sheet`;
+
+-- Inventário/Estoque
+
+create table `inventory_items` (
+			`id_item`			smallint		not null		auto_increment,
+            `item_name` 		varchar(60)		not null,
+            `status` 			ENUM('aprovado', 'rejeitado', 'pendente') default 'pendente',
+)
+
+-- IGNORE --
+--- Dados iniciais (inserção de times e usuários de exemplo) ---
 
 insert into `TEAMS` (`id_team`, `team_name`)
 values ('b80bf62a-6ff5-498e-9b92-12c9d197122d', 'Liora');

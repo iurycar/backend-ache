@@ -236,6 +236,7 @@ def arquivos_usuario():
         	arquivos.append({
                 'id': id_file, 
                 'name': meta['original_name'], 
+                'project': "Projeto  " + meta['project_name'],
                 'importedAt': meta['import_date']
             })
     #print(f"Lista de arquivos encontrada para o usuário {user_id}: {arquivos}")
@@ -245,7 +246,7 @@ def arquivos_usuario():
 
 
 @file_bp.route('/arquivo/<id_file>/dados', methods=['GET'])
-def enviar_dados(id_file):
+def send_data(id_file):
     try:
         user_id = session.get('user_id')
         if not user_id:
@@ -310,7 +311,7 @@ def enviar_dados(id_file):
 
 # Rota para atualizar uma linha da planilha
 @file_bp.route('/arquivo/<id_file>/linha/<int:num>', methods=['PATCH'])
-def atualizar_linha(id_file: str, num: int):
+def update_row(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -403,7 +404,7 @@ def atualizar_linha(id_file: str, num: int):
 
 # Rota para deletar uma linha da planilha
 @file_bp.route('/arquivo/<id_file>/linha/<int:num>', methods=['DELETE'])
-def deletar_linha(id_file: str, num: int):
+def delete_row(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -437,7 +438,7 @@ def deletar_linha(id_file: str, num: int):
 
 # Rota para iniciar uma tarefa
 @file_bp.route('/arquivo/<id_file>/start/<int:num>', methods=['POST'])
-def iniciar_tarefa(id_file: str, num: int):
+def start_task(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -478,7 +479,7 @@ def iniciar_tarefa(id_file: str, num: int):
 
 # Rota para desfazer o início de uma tarefa
 @file_bp.route('/arquivo/<id_file>/start/<int:num>', methods=['DELETE'])
-def desfazer_inicio_tarefa(id_file: str, num: int):
+def undo_start_task(id_file: str, num: int):
     """Remove o start_date (volta tarefa para 'não iniciada' em termos de início)."""
     try:
         user_id = session.get('user_id')
@@ -522,7 +523,7 @@ def desfazer_inicio_tarefa(id_file: str, num: int):
 
 
 @file_bp.route('/arquivo/<id_file>/add_task', methods=['POST'])
-def adicionar_tarefa(id_file: str):
+def add_task(id_file: str):
     dados = request.get_json(silent=True) or {}
 
     user_id = session.get('user_id')
