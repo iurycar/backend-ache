@@ -87,7 +87,7 @@ def adicionarTarefa(mensagem: str) -> str:
     categoria_pattern = r"(categoria[:\-]?\s*(.*?)(?=\s*(classificação|fase|condição|duração|como fazer|documentos|$)))"
     fase_pattern = r"(fase[:\-]?\s*(.*?)(?=\s*(classificação|categoria|condição|duração|como fazer|documentos|$)))"
     condicao_pattern = r"(condição[:\-]?\s*(.*?)(?=\s*(classificação|categoria|fase|duração|como fazer|documentos|$)))"
-    duracao_pattern = r"(\d+\s*(dias|dia|semanas|semana|meses|mês|anos|ano))"
+    duracao_pattern = r"(\d+\s*(dias|dia))"
     documentos_pattern = r"[\w\sáàâãéèêíïóôõöúçñÁÀÂÃÉÈÍÏÓÔÕÖÚÇÑ-]+(?:\.(?:xlsx|csv))"
     projeto_pattern = r"projeto[:\-]?\s*([a-zA-Z0-9 _-]+)"
     tarefa_pattern = r"'(.*?)'"  # Nome da tarefa entre aspas simples
@@ -106,6 +106,8 @@ def adicionarTarefa(mensagem: str) -> str:
         dados['tarefa'] = tarefa_match.group(1).strip()
     if duracao_match:
         dados['duracao'] = duracao_match.group(1).strip()
+    else:
+        return "Desculpe, não consegui identificar a duração da tarefa. Por favor, especifique a duração em dias (ex: '5 dias')."
     if classificacao_match:
         dados['classificacao'] = classificacao_match.group(2).strip()
     if categoria_match:

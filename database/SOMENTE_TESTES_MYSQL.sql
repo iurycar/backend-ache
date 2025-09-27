@@ -18,7 +18,9 @@ select * from `sheet`;
 select * from `employee`;
 select * from `teams`;
 
-REPAIR TABLE `SHEET`;
+select start_date from `sheet`;
+
+update `sheet` set `start_date` = '2025-08-12 12:30:00' where `id_task` = 483;
 
 select max(`num`) from `sheet`;
 

@@ -70,6 +70,8 @@ add constraint `sheet_proj_fk`
 foreign key (`id_file`)
 references `PROJECT` (`id_file`);
 
+describe `sheet`;
+
 insert into `TEAMS` (`id_team`, `team_name`)
 values ('b80bf62a-6ff5-498e-9b92-12c9d197122d', 'Liora');
 

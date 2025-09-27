@@ -10,8 +10,8 @@ import re
 import os
 
 """
-    Esse arquivo é responsável por lidar com as requisições para upload, download e delete de arquivos armazenados. Cria identificadores
-    únicos para os dados recebidos e víncula ao usuário.
+    Esse arquivo é responsável por lidar com as requisições para upload, download e delete de arquivos armazenados. 
+    Cria identificadores únicos para os dados recebidos e víncula ao usuário.
 """
 
 diretorio = Path(__file__).parent
@@ -78,7 +78,7 @@ def upload():
         arquivo.save(arquivo_caminho)
 
         # Pega a data e horário
-        data = datetime.datetime.now().isoformat()
+        date = datetime.datetime.now().astimezone().isoformat()
 
         # Exemplo nome do projeto 'Projeto 1' em "Desafio Número 1_Projeto 1 - Exportado.xlsx"
         project_name_pattern = r'Projeto\s+([^-_]+)'  # Padrão regex para capturar o nome do projeto
@@ -86,7 +86,7 @@ def upload():
         project_name = match.group(1).strip() if match else "Projeto Sem Nome"
 
         # Armazena os metadados do arquivo
-        save_metadata(id_file, original_name, data, id_team, project_name)
+        save_metadata(id_file, original_name, date, id_team, project_name)
 
         # Verifica se o id_file foi salvo corretamente no banco de dados
         project_metadata = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file, id_file=None)
@@ -245,7 +245,7 @@ def arquivos_usuario():
 
 
 @file_bp.route('/arquivo/<id_file>/dados', methods=['GET'])
-def dados(id_file):
+def enviar_dados(id_file):
     try:
         user_id = session.get('user_id')
         if not user_id:
@@ -266,6 +266,39 @@ def dados(id_file):
             end_date=None
         )
 
+        # Converte datetime.datetime para ISO
+        # Calcula o atraso (em dias) para cada tarefa
+        # Não achei maneira mais eficiente de fazer isso :/
+        for linha in dados:
+            if isinstance(linha.get('start_date'), datetime.datetime):
+                
+                dt_inicio = linha['start_date']
+                dias = linha.get('duration', 0)
+
+                if dias.isdigit():
+                    dias = int(dias)
+                else:
+                    dias = 0
+
+                dt_fim = dt_inicio + datetime.timedelta(days=dias)
+                dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
+
+                print(f"Calculando atraso para linha {linha.get('num')}:")
+                print(f"  Data de início: {dt_inicio}")
+                print(f"  Data atual: {dt_hoje}")
+                print(f"  Duração (dias): {dias}")
+                print(f"  Data de fim calculada: {dt_fim}")
+
+                if dt_fim < dt_hoje:
+                    atraso = (dt_hoje - dt_fim).days
+                else:
+                    atraso = 0
+
+                print(f"Atraso calculado para linha {linha.get('num')}: {atraso} dias")
+                
+                linha['atraso'] = atraso
+                linha['start_date'] = linha['start_date'].isoformat()
+        #Start date: 2025-09-26
         if not dados:
             return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
 
@@ -431,10 +464,10 @@ def iniciar_tarefa(id_file: str, num: int):
         if start:
             return jsonify({"mensagem": "A tarefa já está em andamento."}), 400
 
-        data = datetime.datetime.now().isoformat()
+        date = datetime.datetime.now().astimezone().isoformat()
 
         # Atualiza o status da tarefa para "EM ANDAMENTO"
-        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=data)
+        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=date)
 
         return jsonify({"mensagem": "Tarefa iniciada com sucesso."}), 200
 
