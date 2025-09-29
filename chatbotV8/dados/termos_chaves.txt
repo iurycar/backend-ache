@@ -47,3 +47,10 @@ implemente a tarefa :: adicionar_tarefa
 adicionar tarefa :: adicionar_tarefa
 adicione a tarefa :: adicionar_tarefa
 adicione tarefa :: adicionar_tarefa
+calendário :: calendario
+calendários :: calendario
+calendario :: calendario
+tema :: tema
+temas :: tema
+modo :: tema
+modos :: tema

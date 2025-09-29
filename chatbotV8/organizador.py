@@ -13,7 +13,7 @@ caminho_arquivos = diretorio / "backend" /"uploads"
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 # Inicializa o modelo
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 chat_session = model.start_chat(history=[])
 
 def organizar(processo: str, mensagem: str, usuario: str, *args: str) -> str:
