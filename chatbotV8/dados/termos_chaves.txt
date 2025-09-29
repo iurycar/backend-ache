@@ -54,3 +54,7 @@ tema :: tema
 temas :: tema
 modo :: tema
 modos :: tema
+evento :: evento
+eventos :: evento
+reunião :: evento
+reuniões :: evento

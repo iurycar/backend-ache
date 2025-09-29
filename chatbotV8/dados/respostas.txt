@@ -9,3 +9,4 @@ tchau :: Até mais! 😊
 adicionar_tarefa :: 6
 calendario :: O Calendário permite visualizar e gerenciar eventos, reuniões e prazos. Você pode criar novos eventos, visualizar eventos por data e sincronizar com Google Calendar ou Outlook.
 tema :: Você pode alterar o tema do sistema nas Configurações. Lá você encontra a opção para alternar entre tema claro (rosa e branco) e tema escuro (rosa e cinza escuro).
+evento :: No calendário você pode criar um novo evento ou reunião no botão + novo evento e assim ajustar como vai ser esse evento como data, hora e também pode colocar uma tarefas e mostrar o andamento dela durante o mês ou semana.
