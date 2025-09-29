@@ -96,7 +96,7 @@ def treinar() -> None:
                     
                     saida.write(f"{palavra} :: {demanda}\n")
 
-        elif treinamento == 2:
+        elif treinamento == 2: # Treinar respostas
             if visualizar == 1:
                 print("\n"+str(respostas_termos()))
 
