@@ -36,6 +36,8 @@ def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 a
         )
 
         tabela = tabela.upper()
+        params: tuple = () # Parâmetros para consultas SQL
+        resultados: dict = {}
 
         cursor = connection.cursor(dictionary=True) # Cria um cursor
         
@@ -58,23 +60,50 @@ def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 a
                 template_sql_query = Template("INSERT INTO `$tabela` ($colunas) VALUES ($placeholders)")
                 sql_query = template_sql_query.safe_substitute(tabela=tabela, colunas=colunas, placeholders=placeholders)
 
+                print(f"SQL Query: {sql_query} -> {dados}")
+
                 cursor.execute(sql_query, dados) # Executa a solicitação no banco de dados
                 connection.commit() # Commita as inserções
                 print(f"INSERT em {tabela} bem-sucedido!")
                 
             case "SELECT":
-                colunas = ", ".join(colunas_dados.keys())
+                if len(where) >= 2 and len(where) % 2 == 0:
+                    colunas = ", ".join(colunas_dados.keys())
 
-                template_sql_query = Template("SELECT $colunas FROM `$tabela` WHERE $where_coluna = %s")
-                sql_query = template_sql_query.safe_substitute(colunas=colunas, tabela=tabela, where_coluna=where[0])
-                #print(f"SQL Query: {sql_query}")
+                    where_parts: list[str] = []
+                    valores_where: list[object] = []
 
-                cursor.execute(sql_query, (where[1],))
+                    # Monta WHERE com pares (coluna, valor)
+                    for i in range(0, len(where), 2):
+                        # Obtém a coluna e o valor (ex. id_file = '1')
+                        where_coluna = str(where[i])
+                        where_valor = where[i + 1]
+                        
+                        where_parts.append(f"`{where_coluna}` = %s")
+                        valores_where.append(where_valor)
 
-                resultados = {}
+                    # Monta a cláusula WHERE (ex. `id_file` = %s AND `name` = %s)
+                    where_clause = " AND ".join(where_parts)
+
+                    template_sql_query = Template("SELECT $colunas from `$tabela` WHERE $where_clause")
+                    sql_query = template_sql_query.safe_substitute(colunas=colunas, tabela=tabela, where_clause=where_clause)
+
+                    # Monta os parâmetros da consulta
+                    params = tuple(valores_where)
+                    #print(f"SQL Query: {sql_query} -> {params}")
+
+                elif len(where) == 3 and where[2] == "MAX(num)":
+                    template_sql_query = Template("SELECT MAX(num) FROM `$tabela` WHERE $where_coluna = %s")
+                    sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
+                    #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
+                    params = (where[1],)
+                else:
+                    raise ValueError("Parâmetros WHERE inválidos para SELECT.")
+
+                cursor.execute(sql_query, params)
 
                 if tabela == "EMPLOYEE":
-                    consulta = cursor.fetchone()
+                    consulta = cursor.fetchone() # Pega o primeiro resultado da consulta
                     email: str = where[1]
 
                     if consulta:
@@ -82,7 +111,7 @@ def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 a
                         resultados[email] = consulta
 
                 elif tabela == "PROJECT":
-                    consulta_resultados = cursor.fetchall()
+                    consulta_resultados = cursor.fetchall() # Pega todos os resultados da consulta
                     #print(consulta_resultados)
 
                     if consulta_resultados:
@@ -100,13 +129,66 @@ def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 a
                 return resultados
 
             case "UPDATE":
-                pass
-            case "DELETE":
-                template_sql_query = Template("DELETE FROM `$tabela` WHERE $where_coluna = %s")
-                sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
-                cursor.execute(sql_query, (where[1],))
+                if not colunas_dados:
+                    raise ValueError("Nenhuma coluna para atualizar foi informada.")
+
+                # Monta SET: `col` = %s
+                set_cols = ", ".join([f"`{col}` = %s" for col in colunas_dados.keys()])
+
+                # Monta WHERE com pares (coluna, valor)
+                if len(where) == 0 or len(where) % 2 != 0:
+                    raise ValueError("Parâmetros WHERE inválidos para UPDATE.")
+
+                where_parts: list[str] = []
+                valores_where: list[object] = []
+
+                for i in range(0, len(where), 2):
+                    where_coluna = str(where[i])
+                    where_valor = where[i + 1]
+                    where_parts.append(f"`{where_coluna}` = %s")
+                    valores_where.append(where_valor)
+
+                where_clause = " AND ".join(where_parts)
+
+                template_sql_query = Template("UPDATE `$tabela` SET $set_cols WHERE $where_clause")
+                sql_query = template_sql_query.safe_substitute(tabela=tabela, set_cols=set_cols, where_clause=where_clause)
+
+                # Valores: primeiro os do SET, depois os do WHERE
+                params = tuple(colunas_dados.values()) + tuple(valores_where)
+                cursor.execute(sql_query, params)
                 connection.commit()
-                print(f"DELETE {tabela} : {where[1]} bem-sucedido!")
+                print(f"UPDATE {tabela} bem-sucedido! {cursor.rowcount} linha(s) afetada(s).")
+                return {"linhas_afetadas": cursor.rowcount}
+            case "DELETE":
+                # Evitar que de alguma forma coloque * ou sem WHERE e apague tudo :/
+                if len(where) < 2 or len(where) % 2 != 0:
+                    raise ValueError("Parâmetros WHERE inválidos para DELETE.")
+                
+                # Monta WHERE com pares (coluna, valor)
+                if len(where) == 2:
+                    template_sql_query = Template("DELETE FROM `$tabela` WHERE $where_coluna = %s")
+                    sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
+                    params = (where[1],)
+                    
+                elif len(where) > 2 and len(where) % 2 == 0:
+                    where_parts: list[str] = []
+                    valores_where: list[object] = []
+
+                    for i in range(0, len(where), 2):
+                        where_coluna = str(where[i])
+                        where_valor = where[i + 1]
+                        where_parts.append(f"`{where_coluna}` = %s")
+                        valores_where.append(where_valor)
+
+                    where_clause = " AND ".join(where_parts)
+
+                    template_sql_query = Template("DELETE FROM `$tabela` WHERE $where_clause")
+                    sql_query = template_sql_query.safe_substitute(tabela=tabela, where_clause=where_clause)
+                    params = tuple(valores_where)
+                
+                cursor.execute(sql_query, params)
+                connection.commit()
+                print(f"DELETE {tabela} : {params} bem-sucedido!")
 
         #print(f"Requisição: {sql_query}")
         #print(f"{cursor.rowcount} linha(s) modificada(s).")
