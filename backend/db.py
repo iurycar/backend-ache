@@ -92,11 +92,16 @@ def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 a
                     params = tuple(valores_where)
                     #print(f"SQL Query: {sql_query} -> {params}")
 
-                elif len(where) == 3 and where[2] == "MAX(num)":
-                    template_sql_query = Template("SELECT MAX(num) FROM `$tabela` WHERE $where_coluna = %s")
-                    sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
-                    #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
-                    params = (where[1],)
+                elif len(where) == 3:
+                    if where[2] == "MAX(num)":
+                        template_sql_query = Template("SELECT MAX(num) FROM `$tabela` WHERE $where_coluna = %s")
+                        sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
+                        #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
+                        params = (where[1],)
+                elif len(where) == 1:
+                    template_sql_query = Template("SELECT * from `$tabela`")
+                    sql_query = template_sql_query.safe_substitute(tabela=tabela)
+                    params = ()
                 else:
                     raise ValueError("Parâmetros WHERE inválidos para SELECT.")
 

@@ -6,8 +6,8 @@ describe `teams`;
 
 delete from `employee` where user_id = 'b8460203-63b6-49ff-85e2-9e3be1ea20f9';
 delete from `teams` where id_team = '806443c5-9271-464a-a1da-4581c7f766e4';
-delete from `sheet` where id_file = 'b8460203-63b6-49ff-85e2-9e3be1ea20f9.xlsx';
-delete from `project` where id_file = 'b8460203-63b6-49ff-85e2-9e3be1ea20f9.xlsx';
+delete from `sheet` where id_file = 'ea31255b-67bd-4e53-8094-290eecebcb22.xlsx';
+delete from `project` where id_file = 'ea31255b-67bd-4e53-8094-290eecebcb22.xlsx';
 
 update `employee`
 set `password_hash` = '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36'
@@ -26,6 +26,7 @@ select max(`num`) from `sheet`;
 
 insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `name`, `last_name`, `role`, `id_team`)
 values ('b8460203-63b6-49ff-85e2-9e3be1ea20f9', 'usuario2@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Beltrano', 'Fulano Sicrano da Silva', 'admin', 'b80bf62a-6ff5-498e-9b92-12c9d197122d');
+
 start transaction;
 
 update `sheet` set classe = 'Nada Nada' where num = '131';

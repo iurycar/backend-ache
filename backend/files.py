@@ -249,7 +249,9 @@ def arquivos_usuario():
 def send_data(id_file):
     try:
         user_id = session.get('user_id')
-        if not user_id:
+        id_team = session.get('user_team')
+
+        if not user_id and not id_team:
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         dados = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
@@ -284,11 +286,11 @@ def send_data(id_file):
                 dt_fim = dt_inicio + datetime.timedelta(days=dias)
                 dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
 
-                print(f"Calculando atraso para linha {linha.get('num')}:")
-                print(f"  Data de início: {dt_inicio}")
-                print(f"  Data atual: {dt_hoje}")
-                print(f"  Duração (dias): {dias}")
-                print(f"  Data de fim calculada: {dt_fim}")
+                #print(f"Calculando atraso para linha {linha.get('num')}:")
+                #print(f"  Data de início: {dt_inicio}")
+                #print(f"  Data atual: {dt_hoje}")
+                #print(f"  Duração (dias): {dias}")
+                #print(f"  Data de fim calculada: {dt_fim}")
 
                 if dt_fim < dt_hoje:
                     atraso = (dt_hoje - dt_fim).days
@@ -299,7 +301,7 @@ def send_data(id_file):
                 
                 linha['atraso'] = atraso
                 linha['start_date'] = linha['start_date'].isoformat()
-        #Start date: 2025-09-26
+
         if not dados:
             return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
 
@@ -309,9 +311,9 @@ def send_data(id_file):
         print(f"Erro ao buscar todas as tarefas: {error}")
 
 
-# Rota para atualizar uma linha da planilha
+# Rota para atualizar/adicionar uma linha da planilha
 @file_bp.route('/arquivo/<id_file>/linha/<int:num>', methods=['PATCH'])
-def update_row(id_file: str, num: int):
+def update_add_row(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -340,25 +342,37 @@ def update_row(id_file: str, num: int):
             else:
                 update_args[key] = value
 
+        # Define valores padrão se campos estiverem ausentes ou vazios
+        if update_args.get('status') is None or update_args.get('status') == '':
+            update_args['status'] = '??'
+        if update_args.get('classe') is None or update_args.get('classe') == '':
+            update_args['classe'] = 'INDEFINIDO'
+        if update_args.get('name') is None or update_args.get('name') == '':
+            update_args['name'] = 'SEM NOME'
+        if update_args.get('duration') is None or update_args.get('duration') == '':
+            update_args['duration'] = 'INDEFINIDO'
+        if update_args.get('phase') is None or update_args.get('phase') == '':
+            update_args['phase'] = 'INDEFINIDO'
+        if update_args.get('category') is None or update_args.get('category') == '':
+            update_args['category'] = 'INDEFINIDO'
+
         print("Update: ", data)
         print("Update args: ", update_args)
 
         # Normaliza conclusion (0-1)
         if 'conclusion' in update_args:
             try:
-                c = float(update_args['conclusion'])
+                porcentagem = float(update_args['conclusion'])
                 # aceita 0–100 e 0–1; se c>1, converte para 0–1
-                if c <= 1:
-                    update_args['conclusion'] = c
+                if porcentagem <= 1:
+                    update_args['conclusion'] = porcentagem
                 else:
-                    update_args['conclusion'] = min(max(c / 100, 0), 1)
+                    update_args['conclusion'] = min(max(porcentagem / 100, 0), 1)
             except Exception:
                 update_args.pop('conclusion', None)
 
         if not update_args:
             return jsonify({"mensagem": "Nada para atualizar."}), 400
-
-        print(f"Atualizando linha {num} do arquivo {id_file} com: {update_args}")
         
         # Verifica se a linha existe
         linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
@@ -366,30 +380,43 @@ def update_row(id_file: str, num: int):
             num=None
         )
 
+        # Se a linha não existir, insere uma nova linha
         if not linha_existente:
-            num = str(consultaSQL("SELECT", "SHEET", "id_file", id_file[0], "MAX(num)") + 1)
+            # calcular próximo número de linha para este arquivo
+            try:
+                max_result = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'MAX(num)')
+                max_num: int = 0
+                if isinstance(max_result, list) and max_result:
+                    # chave pode ser 'MAX(num)' dependendo do SELECT
+                    row0 = max_result[0]
+                    max_num = int(row0.get('MAX(num)', 0) or 0) # Se for None, usa 0
+            except Exception:
+                max_num = 0
+
+            novo_num: int = max_num + 1
 
             consultaSQL('INSERT', 'SHEET',
                 id_file = id_file,
-                num = num,
+                num = novo_num,
                 classe = update_args.get('classe', ''),
                 category = update_args.get('category', ''),
                 phase = update_args.get('phase', ''),
-                status = update_args.get('status', '').strip().upper(),
+                status = (update_args.get('status', '') or '').strip().upper(),
                 name = update_args.get('name', ''),
                 duration = update_args.get('duration', ''),
-                text = update_args.get('text', ''),
-                reference = update_args.get('reference', ''),
+                text = "Texto."+str(novo_num),
+                reference = "Doc."+str(novo_num),
                 conclusion = update_args.get('conclusion', 0)
             )
 
             return jsonify({
                 "mensagem": "Linha inserida com sucesso.",
-                "inserted": update_args
+                "inserted": {**update_args, 'num': novo_num}
             }), 201
         else:
+            print(f"Atualizando linha {num} do arquivo {id_file} com: {update_args}")
+
             # Executa o UPDATE na linha alvo (chave: id_file + num atual)
-            # Observação: se 'num' estiver em update_args, ele será o NOVO valor.
             consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, **update_args)
 
         return jsonify({
@@ -521,8 +548,6 @@ def undo_start_task(id_file: str, num: int):
         return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
 
 
-
-@file_bp.route('/arquivo/<id_file>/add_task', methods=['POST'])
 def add_task(id_file: str):
     dados = request.get_json(silent=True) or {}
 

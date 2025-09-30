@@ -1,0 +1,9 @@
+{
+    "Duração": ["duração", "tempo", "prazo", "período", "durac.", "durac", "dur.", "dur", "duracao", "duraçao", "duracão"],
+    "Classificação": ["classificação", "classe", "class", "classif", "classifica", "clas", "classif.", "class.", "clas.", "classe.", "classifica.", "classificações", "classes", "classs", "classificao", "classificao."],
+    "Categoria": ["categoria", "grupo", "cat.", "cat", "categ.", "categ", "categorias", "grupos", "embalagens", "categoia", "categora"],
+    "Fase": ["fase", "etapa", "estágio", "passo", "estagio", "fas.", "fa.", "fas"],
+    "Condição": ["condição", "status", "estado", "cond.", "cond", "cod", "cod.", "condiçao", "condicão"],
+    "Documento": ["documentos", "arquivos", "fichas", "doc.", "doc"],
+    "Projeto": ["projeto", "proj.", "proj"]
+}
