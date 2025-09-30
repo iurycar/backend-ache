@@ -1,6 +1,7 @@
-import random
 from .organizador import organizar, chat_avancado
 from .treinar import termos_chaves, respostas_termos
+import random
+import re
 
 """
     Esse arquivo lida com a interpretação das mensagens do usuário e a construção da respostas
@@ -8,6 +9,7 @@ from .treinar import termos_chaves, respostas_termos
 
 def interpretar(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str]:
     mensagem = mensagem.lower()
+    mensagem = re.sub(r'\s+', ' ', mensagem) # Normaliza espaços em branco, removendo espaços extras
 
     # Se já estiver em modo avançado, só desativa se a pessoa pedir "sair"
     if modo_chat == 'avancado':
@@ -22,7 +24,11 @@ def interpretar(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str]:
     msg_chave = set()   # Cria um conjunto
 
     for frase_chave, termo_associado in chaves.items():
-        if frase_chave in mensagem:
+        key = frase_chave.lower().strip()
+        # Cria uma expressão regular para corresponder exatamente a palavra chave
+        pattern = rf'\b{re.escape(key)}\b' # Evita falsos positivos, ex. "oi" em "coisas"
+
+        if re.search(pattern, mensagem):
             msg_chave.add(termo_associado)
 
     # Se não encontrou nada

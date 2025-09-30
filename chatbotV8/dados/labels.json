@@ -1,0 +1,21 @@
+{
+    "1. Escopo & Briefing": ["escopo", "briefing", "escopo & briefing", "escopo e briefing", "escopo e brief", "escopo & brief", "escopo brief", "escopo e breefing", "escopo & breefing", "escopo breefing"],
+    "2. Pesquisa e Análise": ["pesquisa", "análise", "pesquisa e análise", "pesquisa & análise", "pesquisa & analise", "pesquisa analise", "pesquisa e analise", "analise", "analis"],
+    "3. Concepção e Protótipo": ["concepção", "protótipo", "concepcao", "concepçao", "concepcão", "prototipo", "prototipagem", "concepção e protótipo", "concepção & protótipo", "concepção & prototipagem", "concepção prototipagem"],
+    "4. Validação de Conceito": ["validação", "validaçao", "validacão", "validacao", "conceito", "validação de conceito", "validação & conceito", "validação & conceituação", "validação conceituação"],
+    "5. Viabilidade": ["viabilidade", "análise de viabilidade", "estudo de viabilidade", "viabilidade técnica", "viabilidade econômica"],
+    "6. Implementação": ["implementação", "implementaçao", "implementacão", "implementacao", "implementação do projeto"],
+
+    "Blisters": ["blister", "blisters", "blisteres", "blister's", "blisteres'"],
+    "Bisnagas": ["bisnaga", "bisnagas", "bisnaga's", "bisnagas'"],
+    "Cartuchos": ["cartucho", "cartucho's", "cartuchos'"],
+    "Frascos de Plásticos": ["frasco plasticos", "frasco de plastico", "frascos de plasticos", "frasco plastico", "frascos de plastico", "frasco de plástico", "frascos de plástico", "frasco de plásticos", "frascos de plásticos", "frasco de plástico's", "frascos de plástico's", "frasco de plástico's", "frascos de plástico's"],
+    "Frascos de Vidro": ["frasco vidro", "frasco de vidro", "frascos de vidro", "frasco de vidros", "frascos de vidros", "frasco de vidro's", "frascos de vidro's"],
+    "Monodose": ["monodose", "monodoses", "monodose's", "monodoses'"],
+    "Ampolas": ["ampola", "ampolas", "ampola's", "ampolas'"],
+    "Pote de Pó": ["pote de pó", "pote de po", "pote de pós", "pote de pos", "potes de pó", "potes de po", "potes de pós", "potes de pos", "pote de pó's", "pote de po's", "pote de pós's", "pote de pos's", "potes de pó's", "potes de po's", "potes de pós's", "potes de pos's"],
+    "Sachets": ["sachet", "sachets", "sachet's", "sachets'"],
+
+    "Embalagem Primária": ["embalagem primária", "primária", "primaria", "prim"],
+    "Embalagem Secundária": ["secundária", "secundaria", "segunda", "sec"]
+}

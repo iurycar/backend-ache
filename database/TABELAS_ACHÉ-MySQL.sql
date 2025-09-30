@@ -11,19 +11,20 @@ drop table if exists `TEAMS`;
 create table `TEAMS` (
 			`id_team`		varchar(40)		not null,
             `team_name`		varchar(100),
-            primary key(`id_team`)
+            constraint team_id_pk primary key(`id_team`)
 );
 describe `TEAMS`;
 
 create table `EMPLOYEE` (
 			`user_id`		varchar(40)		not null,
-            `email`			varchar(100)	not null unique,
+            `email`			varchar(100)	not null,
             `password_hash`	varchar(64)		not null,
             `name`			varchar(30)		not null,
             `last_name`		varchar(60)		not null,
             `role`			varchar(20)		not null,
             `id_team`		varchar(40)		not null,
-            primary key(`user_id`)
+            constraint emp_id_pk primary key(`user_id`),
+            constraint emp_email_un unique (`email`)
 );
 
 alter table `EMPLOYEE`
@@ -41,7 +42,7 @@ create table `PROJECT` (
             `import_date`	datetime		not null,
             `project_name`  varchar(20)		not null,
             `id_team`		varchar(40)		not null,
-            primary key(`id_file`)
+            constraint project_id_pk primary key(`id_file`)
 );
 
 alter table `PROJECT`
@@ -66,7 +67,7 @@ create table `SHEET` (
             `start_date` 		datetime,
             `end_date` 			datetime,
             `id_file`			varchar(50)		not null,
-            primary key(`id_task`)
+            constraint sheet_id_pk primary key(`id_task`)
 );
 
 alter table `SHEET`
@@ -78,19 +79,10 @@ describe `sheet`;
 
 -- Inventário/Estoque
 
-create table `inventory_items` (
-			`id_item`			smallint		not null		auto_increment,
-            `item_name` 		varchar(60)		not null,
-            `status` 			ENUM('aprovado', 'rejeitado', 'pendente') default 'pendente',
-)
-
--- IGNORE --
---- Dados iniciais (inserção de times e usuários de exemplo) ---
-
-insert into `TEAMS` (`id_team`, `team_name`)
+insert into `TEAMS` (`id_team`, `name_team`)
 values ('b80bf62a-6ff5-498e-9b92-12c9d197122d', 'Liora');
 
-insert into `TEAMS` (`id_team`, `team_name`)
+insert into `TEAMS` (`id_team`, `name_team`)
 values ('061a1547-dd09-4cc7-99e8-4b03b5be7d4b', 'Administradores');
 
 insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `name`, `last_name`, `role`, `id_team`)
