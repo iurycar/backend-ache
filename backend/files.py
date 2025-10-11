@@ -40,7 +40,7 @@ def save_metadata(id_file: str, filename: str, timestamp: str, id_team: str, pro
     )
 
 def duration_to_days(duration) -> int:
-    """Converte uma duração em dias, semanas, meses ou anos para dias."""
+    """Converte uma duração em dias para valor numérico. Remove 'dias' da string."""
     
     # Retorna 0 se duration for None ou vazio
     if not duration or duration is None:
@@ -55,6 +55,7 @@ def duration_to_days(duration) -> int:
     
     texto = str(duration).strip()
 
+    # Usa regex para encontrar o primeiro número na string
     match = re.search(r'(\d+(?:[.,]\d+)?)', texto)
 
     if not match:
@@ -97,7 +98,19 @@ def upload():
             return({'mensagem': 'Formato do arquivo incompatível.'}), 400
 
         # Torna o nome do arquivo seguro e o armazena
-        original_name = secure_filename(arquivo.filename)
+        original_name: str = secure_filename(arquivo.filename)
+
+        consulta = consultaSQL('SELECT', 'PROJECT', 'original_name', original_name, 'id_team', id_team, id_file=None)
+
+        # Se já existir um arquivo com o mesmo nome para o mesmo time, adiciona um sufixo numérico
+        if consulta:
+            split: list[str] = original_name.rsplit('.', 1)
+            name: str = split[0]
+            ext: str = split[1] if len(split) > 1 else ''
+
+            original_name = f"{name}_v{len(consulta)+1}.{ext}"  # Adiciona o sufixo e a extensão de volta
+
+        # Gera um ID único para o arquivo
         id_file = f"{uuid.uuid4()}.xlsx"   # Cria um nome único para o arquivo, a fim de evitar duplicidade e conflitos
         # Acessa a configuração da aplicação principal
         UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER']
@@ -121,6 +134,12 @@ def upload():
             project_name = match2.group(1).strip()
         elif not match and not match2:
             project_name = "Sem Nome"
+
+        consulta = consultaSQL('SELECT', 'PROJECT', 'project_name', project_name, 'id_team', id_team, id_file=None)
+
+        # Se já existir um projeto com o mesmo nome para o mesmo time, adiciona um sufixo numérico
+        if consulta:
+            project_name = f"{project_name} ({len(consulta)+1})"
 
         # Armazena os metadados do arquivo
         save_metadata(id_file, original_name, date, id_team, project_name)
@@ -326,7 +345,7 @@ def send_data(id_file):
                 linha['start_date'] = None
                 continue
 
-            print(f"Duração original para linha {linha.get('num')}: {linha.get('duration')}")
+            #print(f"Duração original para linha {linha.get('num')}: {linha.get('duration')}")
 
             if isinstance(dt_valor, datetime.datetime):
                 dt_inicio = dt_valor
@@ -347,11 +366,11 @@ def send_data(id_file):
             dt_fim = dt_inicio + datetime.timedelta(days=dias)
             dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
 
-            print(f"Calculando atraso para linha {linha.get('num')}:")
-            print(f"  Data de início: {dt_inicio}")
-            print(f"  Data atual: {dt_hoje}")
-            print(f"  Duração (dias): {dias}")
-            print(f"  Data de fim calculada: {prazo}")
+            #print(f"Calculando atraso para linha {linha.get('num')}:")
+            #print(f"  Data de início: {dt_inicio}")
+            #print(f"  Data atual: {dt_hoje}")
+            #print(f"  Duração (dias): {dias}")
+            #print(f"  Data de fim calculada: {prazo}")
 
             #print(f"Atraso calculado para linha {linha.get('num')}: {atraso} dias")
             
@@ -530,7 +549,8 @@ def start_task(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
-        user_name = session.get('user_name')
+        user_name = session.get('user_name', 'Usuário')
+        user_last_name = session.get('user_last_name', '')
 
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
@@ -556,8 +576,23 @@ def start_task(id_file: str, num: int):
 
         date = datetime.datetime.now().astimezone().isoformat()
 
+        responsible_name = user_name + " " + user_last_name
+
         # Atualiza o status da tarefa para "EM ANDAMENTO"
-        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=date, responsible=user_name)
+        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=date, responsible=responsible_name)
+
+        consulta: list[dict] = consultaSQL('SELECT', 'TASK_HISTORY', 'user_id', user_id, "MAX(in_progress)")
+
+        print("Consulta de histórico:", consulta)
+
+        max_in_progress: int = 0
+        if isinstance(consulta, list) and consulta:
+            row: dict = consulta[0]
+            max_in_progress = int(row.get('MAX(in_progress)', 0) or 0)
+        max_in_progress += 1
+
+        # Registra o início da tarefa no histórico
+        consultaSQL('UPDATE', 'TASK_HISTORY', 'user_id', user_id, in_progress=max_in_progress)
 
         return jsonify({"mensagem": "Tarefa iniciada com sucesso."}), 200
 
@@ -610,6 +645,71 @@ def undo_start_task(id_file: str, num: int):
         return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
 
 
+@file_bp.route("/projects/data", methods=['GET'])
+def projects_data():
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+
+        consulta = consultaSQL('SELECT', 'PROJECT', )
+
+    except Exception as error:
+        print(f"Erro ao buscar dados dos projetos: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+
+
+@file_bp.route("/projects/completed/<id_file>", methods=['GET'])
+def project_completed(id_file: str):
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+        
+        consulta: dict = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file,
+            completed=None,
+        )
+
+        if not consulta:
+            return jsonify({"mensagem": "Projeto não encontrado."}), 404
+    
+        if consulta[0].get('completed', 0) == 1:
+            return jsonify({'mensagem': "O projeto já foi concluído."}), 200
+
+        consulta: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
+            conclusion=None,
+            num=None
+        )
+
+        for linha in consulta:
+            if linha.get('conclusion', 0) >= 1:
+                continue
+            else:
+                return jsonify({'mensagem': f"A tarefa {linha.get('num')} ainda não foi concluída."}), 200
+        
+        consultaSQL('UPDATE', 'PROJECT', 'id_file', id_file, completed=1)
+
+        consulta: list[dict] = consultaSQL('SELECT', 'TEAMS', 'id_team', id_team, 'MAX(completed_projects)')
+
+        max_completed: int = 0
+        if isinstance(consulta, list) and consulta:
+            row: dict = consulta[0]
+            max_completed = int(row.get('MAX(completed_projects)', 0) or 0) # Se for None, usa 0
+        
+        max_completed += 1
+
+        consultaSQL('UPDATE', 'TEAMS', 'id_team', id_team, completed_projects=max_completed)
+
+    except Exception as error:
+        print(f"Erro ao buscar dados dos projetos: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+
+
+# Rota para buscar os funcionários do time
 @file_bp.route('/team/employees', methods=['GET'])
 def team_employees():
     try:
@@ -619,11 +719,70 @@ def team_employees():
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        employees = consultaSQL('SELECT', 'EMPLOYEE', 'id_team', id_team, name=None)
+        employees: list[dict] = consultaSQL('SELECT', 'EMPLOYEE', 'id_team', id_team, first_name=None, last_name=None)
+        print(f"Funcionários brutos encontrados para o time {id_team}: {employees}")
 
-        print(f"Funcionários encontrados para o time {id_team}: {employees}")
+        valid_employees: list[dict] = []
 
-        return jsonify({'employees': employees}), 200
+        for emp in employees:
+            complete_name: dict = {}
+            first_name: str = emp.get('first_name', '').strip()
+            last_name: str = emp.get('last_name', '').strip()
+
+            if first_name and last_name:
+                complete_name['name'] = f"{first_name} {last_name}"
+            elif first_name:
+                complete_name['name'] = first_name
+
+            if complete_name:
+                valid_employees.append(complete_name)
+
+        print(f"Funcionários encontrados para o time {id_team}: {valid_employees}")
+
+        return jsonify({'employees': valid_employees}), 200
+    except Exception as error:
+        print(f"Erro ao buscar funcionários do time: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+
+
+# Rota para buscar dados dos funcionários do time
+@file_bp.route('/team/info', methods=['POST'])
+def data_team():
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+        
+        consulta: list[dict] = consultaSQL('SELECT', 'EMPLOYEE', 'id_team', id_team, 
+            email=None,
+            first_name=None,
+            last_name=None,
+            role=None,
+            cellphone=None,
+            active=None
+        )
+
+        if not consulta:
+            return jsonify({"mensagem": "Nenhum funcionário encontrado para este time."}), 404
+        
+        for emp in consulta:
+            consulta_address: list[dict] = consultaSQL('SELECT', 'ADDRESS', 'user_id', emp.get('user_id'), 
+                city=None, 
+                state=None, 
+                country=None
+            )
+
+            if consulta_address:
+                emp['address'] = consulta_address[0]
+            else:
+                emp['address'] = {}
+                emp['address']['city'] = None
+                emp['address']['state'] = None
+                emp['address']['country'] = None
+
+        return jsonify({'employees': consulta}), 200
     except Exception as error:
         print(f"Erro ao buscar funcionários do time: {error}")
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500

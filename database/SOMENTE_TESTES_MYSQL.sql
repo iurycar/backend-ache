@@ -9,10 +9,17 @@ delete from `teams` where id_team = '806443c5-9271-464a-a1da-4581c7f766e4';
 delete from `sheet` where id_file = 'ea31255b-67bd-4e53-8094-290eecebcb22.xlsx';
 delete from `project` where id_file = 'ea31255b-67bd-4e53-8094-290eecebcb22.xlsx';
 
+
+alter table `sheet`
+modify column `responsible` varchar(120);
+
+
 update `employee`
 set `password_hash` = '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36'
 where `user_id` = '806443c5-9271-464a-a1da-4581c7f766e4';
 
+select * from `address`;
+select * from `task_history`;
 select * from `project`;
 select * from `sheet`;
 select * from `employee`;
