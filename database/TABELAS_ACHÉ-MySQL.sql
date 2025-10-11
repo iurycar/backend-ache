@@ -3,26 +3,42 @@ use `ache_db`;
 
 drop table if exists `SHEET`;
 drop table if exists `PROJECT`;
+drop table if exists `TASK_HISTORY`;
 drop table if exists `EMPLOYEE`;
 drop table if exists `TEAMS`;
+drop table if exists `ADDRESS`;
 
 -- Autenticação e times
 
 create table `TEAMS` (
-			`id_team`		varchar(40)		not null,
-            `name_team`		varchar(100),
+			`id_team`				varchar(40)		not null,
+            `completed_projects` 	smallint,
+            `name_team`				varchar(100),
             constraint team_id_pk primary key(`id_team`)
 );
 describe `TEAMS`;
+
+create table `ADDRESS` (
+			`id_address`		smallint		not null,
+            `street_address`	varchar(128)	not null,
+            `postal_code`		varchar(12)		not null,
+            `city`				varchar(32)		not null,
+            `state`				varchar(25)		not null,
+            `country`			char(3)			not null,
+            constraint address_id_pk primary key(`id_address`)
+);
 
 create table `EMPLOYEE` (
 			`user_id`		varchar(40)		not null,
             `email`			varchar(100)	not null,
             `password_hash`	varchar(64)		not null,
-            `name`			varchar(30)		not null,
+            `first_name`	varchar(30)		not null,
             `last_name`		varchar(60)		not null,
             `role`			varchar(20)		not null,
+            `cellphone` 	varchar(20)		not null,
+            `active`		boolean			not null,
             `id_team`		varchar(40)		not null,
+            `id_address`	smallint		not null,
             constraint emp_id_pk primary key(`user_id`),
             constraint emp_email_un unique (`email`)
 );
@@ -32,15 +48,34 @@ add constraint `emp_team_fk`
 foreign key(`id_team`)
 references `TEAMS` (`id_team`);
 
+alter table `EMPLOYEE`
+add constraint `emp_adress_fk`
+foreign key(`id_address`)
+references `ADDRESS` (`id_address`);
+
 describe `EMPLOYEE`;
 
 -- Projetos e Planilhas (TAREFAS)
+
+create table `TASK_HISTORY` (
+			`id_history`	smallint		not null	auto_increment,
+            `completed`		smallint		not null	default 0,
+            `in_progress` 	smallint		not null	default 0,
+            `user_id`		varchar(40)		not null,
+			constraint task_id_pk primary key(`id_history`)
+);
+
+alter table `TASK_HISTORY`
+add constraint `task_emp_id`
+foreign key(`user_id`)
+references `employee` (`user_id`);
 
 create table `PROJECT` (
 			`id_file`		varchar(50)		not null,
             `original_name`	varchar(100)	not null,
             `import_date`	datetime		not null,
             `project_name`  varchar(20)		not null,
+            `completed`		boolean			default		0,
             `id_team`		varchar(40)		not null,
             constraint project_id_pk primary key(`id_file`)
 );
@@ -64,7 +99,7 @@ create table `SHEET` (
             `text`				varchar(12)		not null,
             `reference`			varchar(12)		not null,
             `conclusion`		double			not null,
-            `responsible`		varchar(30),
+            `responsible`		varchar(120),
             `start_date` 		datetime,
             `end_date` 			datetime,
             `id_file`			varchar(50)		not null,
@@ -86,11 +121,32 @@ values ('b80bf62a-6ff5-498e-9b92-12c9d197122d', 'Liora');
 insert into `TEAMS` (`id_team`, `name_team`)
 values ('061a1547-dd09-4cc7-99e8-4b03b5be7d4b', 'Administradores');
 
-insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `name`, `last_name`, `role`, `id_team`)
-values ('806443c5-9271-464a-a1da-4581c7f766e4', 'usuario@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Fulano', 'Sicrano Beltrano', 'admin', 'b80bf62a-6ff5-498e-9b92-12c9d197122d');
+insert into `ADDRESS` (`id_address`, `street_address`, `postal_code`, `city`, `state`, `country`)
+values (1, 'Av. Lins de Vasconcelos, 1222', '04112-002', 'São Paulo', 'SP', 'BR');
 
-insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `name`, `last_name`, `role`, `id_team`)
-values ('b8460203-63b6-49ff-85e2-9e3be1ea20f9', 'usuario2@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Beltrano', 'Fulano Sicrano da Silva', 'admin', 'b80bf62a-6ff5-498e-9b92-12c9d197122d');
+insert into `ADDRESS` (`id_address`, `street_address`, `postal_code`, `city`, `state`, `country`)
+values (2, 'Av. Paulista, 1106', '01311-000', 'São Paulo', 'SP', 'BR');
 
-insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `name`, `last_name`, `role`, `id_team`)
-values ('7bdd3008-26c9-4e83-9317-6e98628819ca', 'usuario3@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Sicrano', 'Beltrano Fulano de Oliveira', 'admin', '061a1547-dd09-4cc7-99e8-4b03b5be7d4b');
+insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `first_name`, `last_name`, `role`, `cellphone`, `active`, `id_team`, `id_address`)
+values ('806443c5-9271-464a-a1da-4581c7f766e4', 'usuario@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Iury', 'Cardoso Araujo', 'Gerente de Projeto', '+55 77 98176-9384', TRUE, 'b80bf62a-6ff5-498e-9b92-12c9d197122d', 1);
+
+insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `first_name`, `last_name`, `role`, `cellphone`, `active`, `id_team`, `id_address`)
+values ('983143c5-5471-483g-a2db-7284d3a754pa', 'usuario2@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Fulano', 'Sicrano Beltrano', 'QA', '+55 11 99823-0494', TRUE, 'b80bf62a-6ff5-498e-9b92-12c9d197122d', 2);
+
+insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `first_name`, `last_name`, `role`, `cellphone`, `active`, `id_team`, `id_address`)
+values ('b8460203-63b6-49ff-85e2-9e3be1ea20f9', 'usuario3@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Beltrano', 'Fulano Sicrano da Silva', 'Desenvolver Python', '+55 75 91234-5678', FALSE, 'b80bf62a-6ff5-498e-9b92-12c9d197122d', 1);
+
+insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `first_name`, `last_name`, `role`, `cellphone`, `active`, `id_team`, `id_address`)
+values ('7bdd3008-26c9-4e83-9317-6e98628819ca', 'usuario4@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Sicrano', 'Beltrano Fulano de Oliveira', 'admin', '+55 11 99032-4125', TRUE, '061a1547-dd09-4cc7-99e8-4b03b5be7d4b', 2);
+
+insert into `TASK_HISTORY` (`user_id`)
+values ('806443c5-9271-464a-a1da-4581c7f766e4');
+
+insert into `TASK_HISTORY` (`user_id`)
+values ('983143c5-5471-483g-a2db-7284d3a754pa');
+
+insert into `TASK_HISTORY` (`user_id`)
+values ('b8460203-63b6-49ff-85e2-9e3be1ea20f9');
+
+insert into `TASK_HISTORY` (`user_id`)
+values ('7bdd3008-26c9-4e83-9317-6e98628819ca');

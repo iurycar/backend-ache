@@ -115,6 +115,19 @@ def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> di
                         sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
                         #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
                         params = (where[1],)
+
+                    if where[2] == "MAX(completed_projects)":
+                        template_sql_query = Template("SELECT MAX(completed_projects) FROM `$tabela` WHERE $where_coluna = %s")
+                        sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
+                        #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
+                        params = (where[1],)
+                    
+                    if where[2] == "MAX(in_progress)":
+                        template_sql_query = Template("SELECT MAX(in_progress) FROM `$tabela` WHERE $where_coluna = %s")
+                        sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
+                        #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
+                        params = (where[1],)
+
                 elif len(where) == 1:
                     template_sql_query = Template("SELECT * from `$tabela`")
                     sql_query = template_sql_query.safe_substitute(tabela=tabela)
@@ -125,8 +138,6 @@ def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> di
                 cursor.execute(sql_query, params)
 
                 if tabela == "EMPLOYEE":
-                    
-
                     if len(where) >= 2 and str(where[0]).lower() == "email":
                         consulta = cursor.fetchone() # Pega o primeiro resultado da consulta
                         email: str = where[1]
@@ -157,6 +168,16 @@ def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> di
                     return consulta_resultados
                 #print(f"Resultado: {resultados}")
 
+                elif tabela == "TEAMS":
+                    consulta = cursor.fetchone() # Pega o primeiro resultado da consulta
+                    if consulta:
+                        return consulta
+                
+                elif tabela == "TASK_HISTORY":
+                    consulta_resultados = cursor.fetchall() # Pega todos os resultados da consulta
+                    return consulta_resultados
+
+                #resultados = cursor.fetchall() # Pega todos os resultados da consulta
                 return resultados
 
             case "UPDATE":
