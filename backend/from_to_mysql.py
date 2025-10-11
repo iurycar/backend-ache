@@ -15,7 +15,7 @@ def to_mysql_inserir(id_file: str) -> None:
             print(f"Erro: O arquivo {file_path} não foi encontrado.")
             return
 
-        sheet = pd.read_excel(file_path)
+        sheet: pd.DataFrame = pd.read_excel(file_path)
 
         # Adiciona o id_file como uma coluna
         sheet['id_file'] = id_file
@@ -70,7 +70,7 @@ def from_mysql_extrair(id_file:str) -> None:
 
         print(f"Buscando dados na tabela SHEET para o arquivo '{id_file}'.")
 
-        sheet = pd.read_sql(sql_query, con=ENGINE)
+        sheet: pd.DataFrame = pd.read_sql(sql_query, con=ENGINE)
 
         if sheet.empty:
             print("Nenhum dado encontrado para o arquivo solicitado.")

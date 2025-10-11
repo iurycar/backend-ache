@@ -10,7 +10,7 @@ drop table if exists `TEAMS`;
 
 create table `TEAMS` (
 			`id_team`		varchar(40)		not null,
-            `team_name`		varchar(100),
+            `name_team`		varchar(100),
             constraint team_id_pk primary key(`id_team`)
 );
 describe `TEAMS`;
@@ -64,6 +64,7 @@ create table `SHEET` (
             `text`				varchar(12)		not null,
             `reference`			varchar(12)		not null,
             `conclusion`		double			not null,
+            `responsible`		varchar(30),
             `start_date` 		datetime,
             `end_date` 			datetime,
             `id_file`			varchar(50)		not null,

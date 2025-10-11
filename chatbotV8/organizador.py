@@ -1,5 +1,5 @@
 from backend.from_to_mysql import from_mysql_extrair
-from .tarefas import adicionarTarefa
+from .tarefas import adicionar_tarefa
 import google.generativeai as genai
 from backend.db import consultaSQL
 from pathlib import Path
@@ -30,7 +30,9 @@ def organizar(processo: str, mensagem: str, usuario: str, *args: str) -> str:
         case 5:
             return ajudar(args)
         case 6:
-            return adicionarTarefa(mensagem)
+            return adicionar_tarefa(mensagem)
+        case 7:
+            return adicionar_evento(mensagem)
         case _:
             return "Desculpe, não sei como lidar com essa solicitação."
 
@@ -58,7 +60,7 @@ def alterar(mudar: str) -> str:
     return f"Alterando o arquivo..."
 
 
-def chat_avancado(mensagem: str) -> str:
+def chatAvancado(mensagem: str) -> str:
     # Prompt inicial
     prompt_base = "Você é a Melora, uma assistente virtual especializada em cronogramas modulares e gestão de projetos. Responda de forma amigável e útil para a seguinte pergunta:"
 
@@ -75,7 +77,7 @@ def ajudar(assunto: str) -> str:
     return f"Você pediu ajuda sobre '{assunto}'. Como posso ajudar você?"
 
 if __name__ == '__main__':
-    #dados = adicionarTarefa("Por favor, adicione a tarefa 'Definir especificações de barreira e proteção dos blisters' com duração de 1 mês. Classificação: Embalagem Primária. Categoria: Blisters. Fase: 1. Escopo & Briefing. Condição: C. Documentos: Desafio_Número_1_Projeto_1_-_Exportado.xlsx")
-    #dados = adicionarTarefa("Por favor, adicione a tarefa 'Definir especificações de barreira e proteção dos blisters' com duração de 1 mês. Classificação: Embalagem Primária. Categoria: Blisters. Fase: 1. Escopo & Briefing. Condição: C. Documentos: Projeto 1")
+    #dados = adicionar_tarefa("Por favor, adicione a tarefa 'Definir especificações de barreira e proteção dos blisters' com duração de 1 mês. Classificação: Embalagem Primária. Categoria: Blisters. Fase: 1. Escopo & Briefing. Condição: C. Documentos: Desafio_Número_1_Projeto_1_-_Exportado.xlsx")
+    #dados = adicionar_tarefa("Por favor, adicione a tarefa 'Definir especificações de barreira e proteção dos blisters' com duração de 1 mês. Classificação: Embalagem Primária. Categoria: Blisters. Fase: 1. Escopo & Briefing. Condição: C. Documentos: Projeto 1")
     #print(dados)
     pass

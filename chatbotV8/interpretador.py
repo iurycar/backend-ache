@@ -1,4 +1,4 @@
-from .organizador import organizar, chat_avancado
+from .organizador import organizar, chatAvancado
 from .treinar import termos_chaves, respostas_termos
 import random
 import re
@@ -16,7 +16,7 @@ def interpretar(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str]:
         if "sair" in mensagem:
             return "Ok, desativando o modo avançado. Como posso te ajudar com as tarefas normais?", "standard"
         else:
-            resposta_gemini = chat_avancado(mensagem)
+            resposta_gemini = chatAvancado(mensagem)
             return resposta_gemini, "avancado"  # Mantém avançado até o "sair"
 
     chaves = termos_chaves() # Dicionário com as palavras chaves
