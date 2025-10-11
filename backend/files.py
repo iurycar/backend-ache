@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify, session, send_from_directory, current_app
 from .from_to_mysql import to_mysql_inserir, from_mysql_extrair
 from werkzeug.utils import secure_filename
-from .db import consultaSQL
+from .db import consultaSQL, ENGINE
+from sqlalchemy import text
 from pathlib import Path
 import datetime
 import uuid
@@ -17,6 +18,7 @@ import os
 diretorio = Path(__file__).parent
 
 def load_metadata(id_team: str) -> "Dados do projeto":
+    """ Carrega os metadados do arquivo do banco de dados. """
     resultados = consultaSQL('SELECT', 'PROJECT', 
         'id_team', id_team,         # SELECIONA ONDE (WHERE) ID_TEAM = ID_TEAM
         id_file=None,               # OS ARGS KEY SÃO AS COLUNAS QUE EU QUERO QUE RETORNE
@@ -28,6 +30,7 @@ def load_metadata(id_team: str) -> "Dados do projeto":
     return resultados
 
 def save_metadata(id_file: str, filename: str, timestamp: str, id_team: str, project_name: str) -> None:
+    """ Salva os metadados do arquivo no banco de dados. """
     consultaSQL('INSERT', 'PROJECT', 
         id_file=id_file, 
         original_name=filename, 
@@ -35,6 +38,32 @@ def save_metadata(id_file: str, filename: str, timestamp: str, id_team: str, pro
         project_name=project_name, 
         id_team=id_team,
     )
+
+def duration_to_days(duration) -> int:
+    """Converte uma duração em dias, semanas, meses ou anos para dias."""
+    
+    # Retorna 0 se duration for None ou vazio
+    if not duration or duration is None:
+        return 0
+    
+    # Se for um número, assume que já está em dias
+    if isinstance(duration, (int, float)):
+        try:
+            return int(float(duration))
+        except Exception:
+            return 0
+    
+    texto = str(duration).strip()
+
+    match = re.search(r'(\d+(?:[.,]\d+)?)', texto)
+
+    if not match:
+        return 0
+
+    try:
+        return int(float(match.group(1).replace(',', '.')))
+    except Exception:
+        return 0
 
 # Criação do Blueprint/Projeto da aplicação de upload/download de arquivos
 file_bp = Blueprint('file_bp', __name__)
@@ -49,7 +78,7 @@ def upload():
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        if not user_id or not id_team:
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."})
 
         # Verifica se tem algum arquivo na requisição
@@ -83,7 +112,15 @@ def upload():
         # Exemplo nome do projeto 'Projeto 1' em "Desafio Número 1_Projeto 1 - Exportado.xlsx"
         project_name_pattern = r'Projeto\s+([^-_]+)'  # Padrão regex para capturar o nome do projeto
         match = re.search(project_name_pattern, arquivo.filename) # Procura o padrão no nome do arquivo
-        project_name = match.group(1).strip() if match else "Projeto Sem Nome"
+        parte_name_pattern = r'Parte\s+([^-_]+)'
+        match2 = re.search(parte_name_pattern, arquivo.filename)
+
+        if match:
+            project_name = match.group(1).strip()
+        elif match2:
+            project_name = match2.group(1).strip()
+        elif not match and not match2:
+            project_name = "Sem Nome"
 
         # Armazena os metadados do arquivo
         save_metadata(id_file, original_name, date, id_team, project_name)
@@ -100,6 +137,9 @@ def upload():
         # Atualiza start_date e end_date em lote (normalizando conclusion 0–1 ou 0–100)
         try:
             with ENGINE.begin() as conn:
+                conn.execute(text("UPDATE sheet SET start_date = NULL WHERE start_date = ''"))
+                conn.execute(text("UPDATE sheet SET end_date = NULL WHERE end_date = ''"))
+
                 conn.execute(
                     text("""
                         UPDATE sheet SET 
@@ -114,7 +154,9 @@ def upload():
                                     CASE WHEN COALESCE(conclusion,0) > 1 THEN COALESCE(conclusion,0)/100 
                                         ELSE COALESCE(conclusion,0) END ) >= 1 THEN NOW()
                             ELSE end_date END 
-                        WHERE id_file = :id_file"""), {"id_file": id_file}
+                        WHERE id_file = :id_file
+                    """), 
+                    {"id_file": id_file}
                 )
         except Exception as error:
             print(f"Falha ao atualizar start/end_date em lote: {error}")
@@ -139,7 +181,7 @@ def download(id_file: str):
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        if not user_id or not id_team:
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."})
 
         metadado_arquivo_importado = load_metadata(id_team)
@@ -177,7 +219,7 @@ def delete(id_file: str):
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        if not user_id or not id_team:
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
         metadado_arquivo_importado = load_metadata(id_team)
@@ -222,7 +264,7 @@ def arquivos_usuario():
 
     print(f"Recebendo requisição para 'arquivos_usuario'. User ID na sessão: {user_id}")
 
-    if not user_id:
+    if (not id_team or not user_id) or (id_team is None or user_id is None):
         return jsonify({'arquivos': arquivos})
     
     metadado_arquivo_importado = load_metadata(id_team)
@@ -251,7 +293,10 @@ def send_data(id_file):
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        if not user_id and not id_team:
+        print(f"Recebendo requisição para 'send_data'. User ID na sessão: {user_id}")
+        print(f"ID do time na sessão: {id_team}")
+
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         dados = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
@@ -266,41 +311,52 @@ def send_data(id_file):
             reference=None,
             conclusion=None,
             start_date=None,
-            end_date=None
+            end_date=None,
+            responsible=None,
         )
 
         # Converte datetime.datetime para ISO
         # Calcula o atraso (em dias) para cada tarefa
         # Não achei maneira mais eficiente de fazer isso :/
         for linha in dados:
-            if isinstance(linha.get('start_date'), datetime.datetime):
-                
-                dt_inicio = linha['start_date']
-                dias = linha.get('duration', 0)
+            dt_valor = linha.get('start_date')
 
-                if dias.isdigit():
-                    dias = int(dias)
-                else:
-                    dias = 0
+            if not dt_valor or dt_valor == '' or dt_valor is None:
+                linha['atraso'] = 0
+                linha['start_date'] = None
+                continue
 
-                dt_fim = dt_inicio + datetime.timedelta(days=dias)
-                dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
+            print(f"Duração original para linha {linha.get('num')}: {linha.get('duration')}")
 
-                #print(f"Calculando atraso para linha {linha.get('num')}:")
-                #print(f"  Data de início: {dt_inicio}")
-                #print(f"  Data atual: {dt_hoje}")
-                #print(f"  Duração (dias): {dias}")
-                #print(f"  Data de fim calculada: {dt_fim}")
+            if isinstance(dt_valor, datetime.datetime):
+                dt_inicio = dt_valor
+            elif isinstance(dt_valor, str) and dt_valor.strip():
+                try:
+                    dt_inicio = datetime.datetime.fromisoformat(dt_valor)
+                except Exception:
+                    continue
+            else:
+                continue
 
-                if dt_fim < dt_hoje:
-                    atraso = (dt_hoje - dt_fim).days
-                else:
-                    atraso = 0
+            dias: int = duration_to_days(linha.get('duration'))
+            prazo = (dt_inicio + datetime.timedelta(days=dias)).date()
+            dt_hoje = datetime.datetime.now(dt_inicio.tzinfo).date()
 
-                print(f"Atraso calculado para linha {linha.get('num')}: {atraso} dias")
-                
-                linha['atraso'] = atraso
-                linha['start_date'] = linha['start_date'].isoformat()
+            atraso = max((dt_hoje - prazo).days, 0)
+
+            dt_fim = dt_inicio + datetime.timedelta(days=dias)
+            dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
+
+            print(f"Calculando atraso para linha {linha.get('num')}:")
+            print(f"  Data de início: {dt_inicio}")
+            print(f"  Data atual: {dt_hoje}")
+            print(f"  Duração (dias): {dias}")
+            print(f"  Data de fim calculada: {prazo}")
+
+            #print(f"Atraso calculado para linha {linha.get('num')}: {atraso} dias")
+            
+            linha['atraso'] = atraso
+            linha['start_date'] = linha['start_date'].isoformat()
 
         if not dados:
             return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
@@ -318,7 +374,7 @@ def update_add_row(id_file: str, num: int):
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        if not user_id or not id_team:
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         # Verifica se o arquivo pertence ao time do usuário
@@ -328,10 +384,14 @@ def update_add_row(id_file: str, num: int):
 
         data = request.get_json(silent=True) or {} # Dados enviados na requisição
 
+        if 'responsavel' in data and 'responsible' not in data:
+            data['responsible'] = data.pop('responsavel')
+
         # Campos permitidos para atualização
         permitidos = {
             'num', 'classe', 'category', 'phase', 'status',
-            'name', 'duration', 'text', 'reference', 'conclusion'
+            'name', 'duration', 'text', 'reference', 'conclusion',
+            'responsible'
         }
 
         # Filtra apenas os campos permitidos
@@ -388,8 +448,8 @@ def update_add_row(id_file: str, num: int):
                 max_num: int = 0
                 if isinstance(max_result, list) and max_result:
                     # chave pode ser 'MAX(num)' dependendo do SELECT
-                    row0 = max_result[0]
-                    max_num = int(row0.get('MAX(num)', 0) or 0) # Se for None, usa 0
+                    row = max_result[0]
+                    max_num = int(row.get('MAX(num)', 0) or 0) # Se for None, usa 0
             except Exception:
                 max_num = 0
 
@@ -406,7 +466,8 @@ def update_add_row(id_file: str, num: int):
                 duration = update_args.get('duration', ''),
                 text = "Texto."+str(novo_num),
                 reference = "Doc."+str(novo_num),
-                conclusion = update_args.get('conclusion', 0)
+                conclusion = update_args.get('conclusion', 0),
+                responsible = update_args.get('responsible', '')
             )
 
             return jsonify({
@@ -436,7 +497,7 @@ def delete_row(id_file: str, num: int):
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        if not user_id or not id_team:
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         # Verifica se o arquivo pertence ao time do usuário
@@ -469,8 +530,9 @@ def start_task(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
+        user_name = session.get('user_name')
 
-        if not user_id or not id_team:
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         # Verifica se o arquivo pertence ao time do usuário
@@ -495,7 +557,7 @@ def start_task(id_file: str, num: int):
         date = datetime.datetime.now().astimezone().isoformat()
 
         # Atualiza o status da tarefa para "EM ANDAMENTO"
-        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=date)
+        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=date, responsible=user_name)
 
         return jsonify({"mensagem": "Tarefa iniciada com sucesso."}), 200
 
@@ -512,7 +574,7 @@ def undo_start_task(id_file: str, num: int):
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        if not user_id or not id_team:
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         # Verifica se o arquivo pertence ao time do usuário
@@ -548,12 +610,20 @@ def undo_start_task(id_file: str, num: int):
         return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
 
 
-def add_task(id_file: str):
-    dados = request.get_json(silent=True) or {}
+@file_bp.route('/team/employees', methods=['GET'])
+def team_employees():
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
 
-    user_id = session.get('user_id')
-    id_team = session.get('user_team')
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-    if not user_id or not id_team:
-        return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
-    
+        employees = consultaSQL('SELECT', 'EMPLOYEE', 'id_team', id_team, name=None)
+
+        print(f"Funcionários encontrados para o time {id_team}: {employees}")
+
+        return jsonify({'employees': employees}), 200
+    except Exception as error:
+        print(f"Erro ao buscar funcionários do time: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500

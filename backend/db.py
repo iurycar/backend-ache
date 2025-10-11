@@ -24,7 +24,24 @@ class Database:
     def __init__(self):
         pass
 
-def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 args - ex. id = '1'", **colunas_dados: "Colunas desejadas") -> dict | None:
+def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> dict | None:
+    """
+    Função para consultas SQL no banco de dados.
+
+    @param tipo: Tipo de consulta - "INSERT", "SELECT", "UPDATE", "DELETE"
+
+    @param tabela: Nome da tabela no banco de dados
+
+    @param where: Parâmetros para cláusula WHERE (ex. 'id', '1', 'name', 'John' => WHERE id='1' AND name='John')
+
+    @param colunas_dados: Colunas e seus valores para INSERT ou UPDATE (ex. id='1', name='John')
+    
+    @return: Dicionário com os resultados da consulta ou None
+    """
+
+    if tipo not in ["INSERT", "SELECT", "UPDATE", "DELETE"]:
+        raise ValueError("Tipo de consulta inválido. Use 'INSERT', 'SELECT', 'UPDATE' ou 'DELETE'.")
+        
     try:
         # Estabelece a conexão
         connection = mysql.connector.connect(
@@ -108,12 +125,21 @@ def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 a
                 cursor.execute(sql_query, params)
 
                 if tabela == "EMPLOYEE":
-                    consulta = cursor.fetchone() # Pega o primeiro resultado da consulta
-                    email: str = where[1]
+                    
 
-                    if consulta:
-                        #print(f"Consulta: {consulta}")
-                        resultados[email] = consulta
+                    if len(where) >= 2 and str(where[0]).lower() == "email":
+                        consulta = cursor.fetchone() # Pega o primeiro resultado da consulta
+                        email: str = where[1]
+
+                        if consulta:
+                            #print(f"Consulta: {consulta}")
+                            resultados[email] = consulta
+                        return resultados
+                    
+                    consulta_resultados = cursor.fetchall() # Pega todos os resultados da consulta
+                    #print(consulta_resultados)
+                    if consulta_resultados:
+                        return consulta_resultados
 
                 elif tabela == "PROJECT":
                     consulta_resultados = cursor.fetchall() # Pega todos os resultados da consulta
@@ -212,7 +238,7 @@ def consultaSQL(tipo: "Tipo de consulta", tabela: "Nome da tabela", *where: "2 a
 
 
 if __name__ == "__main__":
-    #consultaSQL()
+    consultaSQL()
 
     """consultaSQL("INSERT", "EMPLOYEE", 
     user_id =       '806443c5-9271-464a-a1da-4581c7f766e4', 

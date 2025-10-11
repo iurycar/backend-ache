@@ -12,8 +12,7 @@ caminho_dados = diretorio / "dados"
 caminho_termo = caminho_dados / "sinonimos.json"
 caminho_labels = caminho_dados / "labels.json"
 
-def adicionarTarefa(mensagem: str) -> str:
-    # Colunas: Número (autoincremento), Classificação, Categoria, Fase, Condição, Nome, Duração, Como fazer, Documentos
+def adicionar_tarefa(mensagem: str) -> str:
     coluna: str
     id_file: list[str] = []
 
@@ -207,29 +206,29 @@ def normalizar_mensagem(mensagem: str) -> str:
     # Protege o conteúdo entre aspas simples para não ser alterado
     placeholders: dict[str, str] = {}
     def _stash(match):
-        key = f"__Q{len(placeholders)}__"
-        placeholders[key] = match.group(0)
-        return key
-    mensagem_protegida = re.sub(r"'[^']*'", _stash, mensagem)
+        chave = f"__Q{len(placeholders)}__" # Gera uma chave única
+        placeholders[chave] = match.group(0) # Protege o conteúdo entre aspas simples
+        return chave
+    mensagem_protegida: str = re.sub(r"'[^']*'", _stash, mensagem)
 
     print(f"Mensagem original: {mensagem}")
     print(f"Placeholders: {placeholders}")
     print(f"Mensagem protegida: {mensagem_protegida}")
 
     with open(caminho_termo, "r", encoding="utf-8") as f:
-        sinonimos: json = json.load(f)
+        sinonimos: dict[str, list[str]] = json.load(f)
         #print(f"Sinonimos carregados:\n{sinonimos}")
 
     # Substitui os sinonimos dos termos pelos termos padrões
     rotulos = {"duração", "classificação", "categoria", "fase", "condição", "documentos", "documento", "projeto"}
     for termo_padrao, sinonimos_termo in sinonimos.items():
-        label = termo_padrao.lower().strip()
+        label: str = termo_padrao.lower().strip()
         
         if label not in rotulos:
             continue
         for sinonimo in sinonimos_termo:
-            txt = sinonimo.lower().strip()
-            pattern = rf"\b{re.escape(txt)}\.?\b"
+            txt: str = sinonimo.lower().strip()
+            pattern: str = rf"\b{re.escape(txt)}\.?\b"
             mensagem_protegida = re.sub(pattern, label, mensagem_protegida, flags=re.IGNORECASE)
 
     # Restaura o conteúdo protegido entre aspas simples
@@ -240,12 +239,12 @@ def normalizar_mensagem(mensagem: str) -> str:
 
 
 def mapear_labels(valor: str) -> str:
-    """ Mapeia valores para rótulos padrão usando um dicionário de labels """
-    """ Substitui valores por labels padrões para simplificar o regex """
+    """ Mapeia valores para rótulos padrão usando um dicionário de labels
+     Substitui valores por labels padrões para simplificar o regex """
     valor = valor.lower().strip()
 
     with open(caminho_labels, "r", encoding="utf-8") as f:
-        labels: dict = json.load(f)
+        labels: dict[str, list[str]] = json.load(f)
         #print(f"Labels carregados:\n{labels}")
 
     for labels_padrao, variantes_label in labels.items():
@@ -262,3 +261,6 @@ def limpar_texto(string: str) -> str:
     string = re.sub(r'^\s*[:.\-–—]*\s*', '', string) # Remove prefixos como ":", "-", "--" e "---"
     string = re.sub(r'[\s,.;:]+$', '', string) # Remove pontuação no final
     return string.strip()
+
+if __name__ == "__main__":
+    pass
