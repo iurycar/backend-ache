@@ -4,8 +4,9 @@ diretorio = Path(__file__).parent
 caminho_termo = diretorio / "dados" / "termos_chaves.txt"
 caminho_resposta = diretorio / "dados" / "respostas.txt"
 
-# Função para acessar os dados treinados para perguntas no aqui termos_chaves.txt
-def termos_chaves() -> dict:
+def get_keywords() -> dict:
+    """ Função para acessar os dados treinados para perguntas no arquivo termos_chaves.txt.
+    @return: Dicionário com palavras chaves e suas respectivas demandas."""
     # Verifica se o arquivo existe
     if caminho_termo.exists():
         palavras_chave = {}
@@ -30,8 +31,12 @@ def termos_chaves() -> dict:
 
     else:
         print(f"Erro: O arquivo '{caminho_termo}' não encontrado.")
+
+def get_response_keywords() -> dict:
+    """ Função para acessar os dados treinados para respostas no arquivo respostas.txt.
+    @return: Dicionário com demandas e suas respectivas respostas."""
     
-def respostas_termos() -> dict:
+    # Verifica se o arquivo existe
     if caminho_resposta.exists():
         responder_chaves = {}
 
@@ -57,12 +62,12 @@ def respostas_termos() -> dict:
     else:
         print(f"Erro: O arquivo '{caminho_resposta}' não encontrado.")
 
-def treinar() -> None:
+def training() -> None:
     print(""""
                     #####################################################################
                     #                                                                   #
                     #                  Treinamento da Assistente Virtual                #
-                    #                           Melora V0.8                             #
+                    #                           Melora V1.0                             #
                     #                                                                   #
                     #####################################################################
     """)
@@ -110,4 +115,4 @@ def treinar() -> None:
 
 
 if __name__ == '__main__':
-    treinar()
+    training()

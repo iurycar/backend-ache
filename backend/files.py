@@ -295,8 +295,6 @@ def send_data(id_file):
         if completed[0].get('completed', 0) == 0:        
             data = calculate_delay(data)
 
-        print(f"\n\nCompleted data: {completed}\n\n")
-
         return jsonify({'dados': data}), 200
 
     except Exception as error:
@@ -590,28 +588,24 @@ def project_completed(id_file: str):
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
+        print(f"Recebendo requisição para 'project_completed'. User ID na sessão: {user_id}")
+
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
-        consulta: dict = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file,
-            completed=None,
-        )
+        consulta: dict = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file, completed=None)
+        project_rows = rows_list(consulta)
 
         if not consulta:
             return jsonify({"mensagem": "Projeto não encontrado."}), 404
-    
-        if consulta[0].get('completed', 0) == 1:
+
+        if int(project_rows[0].get('completed', 0)) == 1:
             return jsonify({'mensagem': "O projeto já foi concluído."}), 200
 
-        consulta: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
-            conclusion=None,
-            num=None
-        )
+        consulta: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, conclusion=None, num=None)
 
         for linha in consulta:
-            if linha.get('conclusion', 0) >= 1:
-                continue
-            else:
+            if float(linha.get('conclusion', 0)) < 1:
                 return jsonify({'mensagem': f"A tarefa {linha.get('num')} ainda não foi concluída."}), 200
         
         consultaSQL('UPDATE', 'PROJECT', 'id_file', id_file, completed=1)
@@ -621,12 +615,14 @@ def project_completed(id_file: str):
         max_completed: int = 0
         if isinstance(consulta, list) and consulta:
             row: dict = consulta[0]
-            max_completed = int(row.get('MAX(completed_projects)', 0) or 0) # Se for None, usa 0
-        
+            max_completed = int(row.get('MAX(completed_projects)', 0) or 0) # Se for None, usa 0        
         max_completed += 1
 
         consultaSQL('UPDATE', 'TEAMS', 'id_team', id_team, completed_projects=max_completed)
 
+        print(f"Projeto {id_file} marcado como concluído.")
+
+        return jsonify({'mensagem': "Projeto marcado como concluído com sucesso."}), 200
     except Exception as error:
         print(f"Erro ao buscar dados dos projetos: {error}")
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
@@ -642,11 +638,12 @@ def team_employees():
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
+        # Buscar todos os funcionários do time
         employees: list[dict] = consultaSQL('SELECT', 'EMPLOYEE', 'id_team', id_team, first_name=None, last_name=None)
-        print(f"Funcionários brutos encontrados para o time {id_team}: {employees}")
 
         valid_employees: list[dict] = []
 
+        # Filtra apenas os funcionários com nome e sobrenome válidos
         for emp in employees:
             complete_name: dict = {}
             first_name: str = emp.get('first_name', '').strip()
@@ -690,6 +687,7 @@ def data_team():
         if not consulta:
             return jsonify({"mensagem": "Nenhum funcionário encontrado para este time."}), 404
         
+        # Para cada funcionário, buscar o endereço
         for emp in consulta:
             consulta_address: list[dict] = consultaSQL('SELECT', 'ADDRESS', 'user_id', emp.get('user_id'), 
                 city=None, 
@@ -730,32 +728,31 @@ def project_progress_tasks(id_file: str):
             'overdue': 0
         }
 
+        # Se id_file for 'all' ou vazio, então pegar o progresso de todos os projetos ativos do time
         all_projects = (not id_file) or (id_file.strip() == '') or (id_file == None) or (id_file.lower() == 'null')
 
         if all_projects:
-            # Quer dizer que o usuário quer o progresso de todos os projetos ativos do time
-            # Então eu preciso pegar todos os projetos ativos do time
+
             consulta_projetos: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team,
                 completed=None,
                 id_file=None,
                 project_name=None
             )
 
+            # Transforma a lista de dicionários em uma lista simples de dicionários
             project_rows = rows_list(consulta_projetos)
 
             if not project_rows:
                 return jsonify({"mensagem": "Nenhum projeto ativo encontrado para este time."}), 404
 
-            print(f"Projetos ativos encontrados para o time {id_team}: {consulta_projetos}")
-
+            # Para cada projeto, calcular o progresso
             for projeto in project_rows:
-                print(f"\nCalculando progresso para o projeto {projeto['project_name']}\n")
-                pid = projeto.get('id_file')
+                pid = projeto.get('id_file') # Pega o id_file do projeto
                 
                 if not pid:
-                    print(f"Projeto sem id_file: {projeto}")
                     continue
 
+                # Se o projeto já estiver concluído, então todas as tarefas estão concluídas
                 if int(projeto.get('completed', 0) or 0) == 1:
                     consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', projeto['id_file'], "COUNT(*)")
                     
@@ -765,10 +762,11 @@ def project_progress_tasks(id_file: str):
                         progresso['concluded'] += total
                     continue
 
+                # Se o projeto não estiver concluído, calcular o progresso normalmente
                 progresso = calculate_progress(projeto['id_file'], progresso)
 
         else: 
-            # Se o id_file foi fornecido, então eu pego o progresso só daquele projeto
+            # Se o id_file foi fornecido, então pega o progresso somente daquele projeto
             consulta_projeto: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team, 'id_file', id_file,
                 completed=None,
                 id_file=None,
@@ -780,12 +778,13 @@ def project_progress_tasks(id_file: str):
 
             print(f"Projeto ativo encontrado para o time {id_team}: {consulta_projeto}")
 
-            if consulta_projeto[id_file].get('completed', 0) == 1:
+            # Se o projeto já estiver concluído, então todas as tarefas estão concluídas
+            if int(consulta_projeto[id_file].get('completed', 0)) == 1:
                 consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, "COUNT(*)")
                 
                 if consulta_tarefas:
-                    progresso['total'] += consulta_tarefas[id_file].get('COUNT(*)', 0)
-                    progresso['concluded'] += consulta_tarefas[id_file].get('COUNT(*)', 0)
+                    progresso['total'] += consulta_tarefas[0].get('COUNT(*)', 0)
+                    progresso['concluded'] += consulta_tarefas[0].get('COUNT(*)', 0)
             else:
                 progresso = calculate_progress(id_file, progresso)
 

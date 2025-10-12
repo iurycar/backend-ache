@@ -12,7 +12,12 @@ caminho_dados = diretorio / "dados"
 caminho_termo = caminho_dados / "sinonimos.json"
 caminho_labels = caminho_dados / "labels.json"
 
-def adicionar_tarefa(mensagem: str) -> str:
+def add_task(mensagem: str) -> str:
+    """" Função para adicionar uma tarefa a uma planilha de cronograma modular.
+    @param mensagem: Mensagem contendo os detalhes da tarefa.
+    @return: Mensagem de confirmação ou erro.
+    """
+    
     coluna: str
     id_file: list[str] = []
 
@@ -27,7 +32,7 @@ def adicionar_tarefa(mensagem: str) -> str:
         'documentos': None,  # Documentos relacionados
     }
 
-    mensagem = normalizar_mensagem(mensagem)
+    mensagem = normalize_message(mensagem)
 
     # Usa a biblioteca 'Regular Expression' para extrair as informações
     # Define os padrões na mensagem
@@ -56,7 +61,7 @@ def adicionar_tarefa(mensagem: str) -> str:
 
     # Armazena os dados extraídos no dicionário
     if tarefa_match:
-        dados['tarefa'] = limpar_texto(tarefa_match.group(1).strip())
+        dados['tarefa'] = clean_text(tarefa_match.group(1).strip())
 
     # Converte a duração para dias
     if duracao_match:
@@ -75,19 +80,19 @@ def adicionar_tarefa(mensagem: str) -> str:
         return "Desculpe, não consegui identificar a duração da tarefa. Por favor, especifique a duração em dias (ex: '5 dias')."
     
     if classificacao_match:
-        bruto = limpar_texto(classificacao_match.group(2).strip())
-        dados['classificacao'] = mapear_labels(bruto)
+        bruto = clean_text(classificacao_match.group(2).strip())
+        dados['classificacao'] = map_labels(bruto)
 
     if categoria_match:
-        bruto = limpar_texto(categoria_match.group(2).strip())
-        dados['categoria'] = mapear_labels(bruto)
+        bruto = clean_text(categoria_match.group(2).strip())
+        dados['categoria'] = map_labels(bruto)
 
     if fase_match:
-        bruto = limpar_texto(fase_match.group(2).strip().rstrip('.'))
-        dados['fase'] = mapear_labels(bruto)
+        bruto = clean_text(fase_match.group(2).strip().rstrip('.'))
+        dados['fase'] = map_labels(bruto)
 
     if condicao_match:
-        bruto = limpar_texto(condicao_match.group(2).strip())
+        bruto = clean_text(condicao_match.group(2).strip())
         primeiro = bruto.split()[0].strip().upper()
         if primeiro in ['SEMPRE', 'A', 'B', 'C']:
             dados['condicao'] = primeiro
@@ -199,7 +204,7 @@ def adicionar_tarefa(mensagem: str) -> str:
     return f"Tarefa '{tarefa}' adicionada com sucesso! Detalhes:\n- Duração: {duracao}\n- Classificação: {classificacao}\n- Categoria: {categoria}\n- Fase: {fase}\n- Condição: {condicao}\n- Documentos: {documentos}"
 
 
-def normalizar_mensagem(mensagem: str) -> str:
+def normalize_message(mensagem: str) -> str:
     """ Substitui sinonimos por termos padrões para simplificar o regex """
     mensagem = mensagem.lower().strip()
 
@@ -238,7 +243,7 @@ def normalizar_mensagem(mensagem: str) -> str:
     return re.sub(r'\s+', ' ', mensagem_protegida).strip()  # Remove espaços extras
 
 
-def mapear_labels(valor: str) -> str:
+def map_labels(valor: str) -> str:
     """ Mapeia valores para rótulos padrão usando um dicionário de labels
      Substitui valores por labels padrões para simplificar o regex """
     valor = valor.lower().strip()
@@ -248,13 +253,14 @@ def mapear_labels(valor: str) -> str:
         #print(f"Labels carregados:\n{labels}")
 
     for labels_padrao, variantes_label in labels.items():
-        if valor in [v.lower().strip() for v in variantes_label]:
-            return labels_padrao
+        for value in variantes_label:
+            if valor == value.lower().strip():
+                return labels_padrao 
     
     return valor.capitalize()  # Retorna o valor original se não encontrar correspondência
 
 
-def limpar_texto(string: str) -> str:
+def clean_text(string: str) -> str:
     """ Limpa a string removendo espaços extras e pontuação desnecessária """
     string = string.strip()  # Remove espaços em branco no início e no fim
     string = re.sub(r'\s+', ' ', string)  # Substitui múltiplos espaços por um único espaço
