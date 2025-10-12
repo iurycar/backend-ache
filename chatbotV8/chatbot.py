@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from .interpretador import interpretar
+from .interpreter import get_intention
 
 """
     Esse arquivo é responsável por lidar com as requisições de mensagens para a Melora
@@ -26,7 +26,7 @@ def chat():
         #print(f"Modo da sessão ATUAL: '{modo_chat}'")
 
         # Envia a mensagem e o modo do chat para o interpretador
-        resposta_chatbot, proximo_modo_chat = interpretar(mensagem, usuario, modo_chat)
+        resposta_chatbot, proximo_modo_chat = get_intention(mensagem, usuario, modo_chat)
 
         #print(f"--- DEPOIS DE INTERPRETAR ---")
         #print(f"Resposta gerada: '{resposta_chatbot}'")

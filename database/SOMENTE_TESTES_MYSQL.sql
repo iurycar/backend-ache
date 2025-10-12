@@ -25,18 +25,20 @@ select * from `sheet`;
 select * from `employee`;
 select * from `teams`;
 
-select * from `sheet` where `id_file` = 'bb2dc2cb-2ff4-460a-8a81-bca8e0ceeb23.xlsx';
+select * from `sheet` where `id_file` = 'a5108b4f-e14c-4761-ac46-c2f2d43acc66.xlsx';
 
-UPDATE `sheet` SET `start_date` = NOW() WHERE (`start_date` IS NULL) AND (`conclusion` > 0 AND `conclusion` < 1);
+update `sheet` set `conclusion` = 1 where `id_file` = 'a5108b4f-e14c-4761-ac46-c2f2d43acc66.xlsx';
+
+UPDATE `sheet` SET `end_date` = NOW() WHERE (`end_date` IS NULL) AND (`conclusion` >= 1);
 
 select `completed`, `id_file`, `project_name` from `project` where `id_team` = 'b80bf62a-6ff5-498e-9b92-12c9d197122d';
-select COUNT(*) from sheet where `id_file` = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx';
+select COUNT(*) from `sheet` where `id_file` = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx';
 
 SELECT COUNT(*) AS 'concluidas' FROM `sheet` WHERE `id_file` = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx' AND `conclusion` = 1;
 SELECT COUNT(*) AS 'overdue' FROM `sheet` WHERE `id_file` = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx' AND `conclusion` < 1 AND start_date < NOW();
 SELECT `start_date`, `duration`, `conclusion` FROM `sheet` WHERE `id_file` = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx' AND `start_date` IS NOT NULL AND `conclusion` < 1;
 
-select start_date from `sheet`;
+select `start_date` from `sheet`;
 
 update `sheet` set `start_date` = '2025-08-24 12:03:00' where `id_task` = 3283;
 
