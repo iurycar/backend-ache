@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from string import Template
 import mysql.connector
+import datetime
 import os
 
 """
@@ -77,7 +78,7 @@ def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> di
                 template_sql_query = Template("INSERT INTO `$tabela` ($colunas) VALUES ($placeholders)")
                 sql_query = template_sql_query.safe_substitute(tabela=tabela, colunas=colunas, placeholders=placeholders)
 
-                print(f"SQL Query: {sql_query} -> {dados}")
+                #print(f"SQL Query: {sql_query} -> {dados}")
 
                 cursor.execute(sql_query, dados) # Executa a solicitação no banco de dados
                 connection.commit() # Commita as inserções
@@ -107,23 +108,29 @@ def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> di
 
                     # Monta os parâmetros da consulta
                     params = tuple(valores_where)
+                    
                     #print(f"SQL Query: {sql_query} -> {params}")
 
-                elif len(where) == 3:
-                    if where[2] == "MAX(num)":
-                        template_sql_query = Template("SELECT MAX(num) FROM `$tabela` WHERE $where_coluna = %s")
-                        sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
-                        #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
-                        params = (where[1],)
-
-                    if where[2] == "MAX(completed_projects)":
-                        template_sql_query = Template("SELECT MAX(completed_projects) FROM `$tabela` WHERE $where_coluna = %s")
-                        sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
-                        #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
-                        params = (where[1],)
+                elif len(where) != 1 and len(where) % 2 != 0:
+                    match where[2]:
+                        case "MAX(num)":
+                            template_sql_query = Template("SELECT MAX(num) FROM `$tabela` WHERE $where_coluna = %s")
+                        case "MAX(completed_projects)":
+                            template_sql_query = Template("SELECT MAX(completed_projects) FROM `$tabela` WHERE $where_coluna = %s")
+                        case "MAX(in_progress)":
+                            template_sql_query = Template("SELECT MAX(in_progress) FROM `$tabela` WHERE $where_coluna = %s")
+                        case "COUNT(*)":
+                            template_sql_query = Template("SELECT COUNT(*) FROM `$tabela` WHERE $where_coluna = %s")
+                        case "CONCLUDED":
+                            template_sql_query = Template("SELECT COUNT(*) FROM `$tabela` WHERE $where_coluna = %s AND conclusion = 1")
+                        case "NOT_STARTED":
+                            template_sql_query = Template("SELECT COUNT(*) FROM `$tabela` WHERE $where_coluna = %s AND start_date IS NULL")
+                        case "IN_PROGRESS":
+                            template_sql_query = Template("SELECT `start_date`, `duration`, `conclusion` FROM `$tabela` WHERE $where_coluna = %s AND start_date IS NOT NULL AND conclusion < 1")
+                        case _:
+                            pass
                     
-                    if where[2] == "MAX(in_progress)":
-                        template_sql_query = Template("SELECT MAX(in_progress) FROM `$tabela` WHERE $where_coluna = %s")
+                    if template_sql_query:
                         sql_query = template_sql_query.safe_substitute(tabela=tabela, where_coluna=where[0])
                         #print(f"SQL Query: {sql_query} -> %s: {where[1]}")
                         params = (where[1],)
@@ -157,12 +164,14 @@ def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> di
                     #print(consulta_resultados)
 
                     if consulta_resultados:
-                        for consulta in consulta_resultados:
-                            file_id = consulta['id_file']
-                            resultados[file_id] = consulta
-                            #print(f"\nConsulta: {consulta}")  
-                            #print(f"\nResultado: {resultados}")
-                
+                        if 'id_file' in consulta_resultados[0]:
+                            for consulta in consulta_resultados:
+                                file_id = consulta['id_file']
+                                resultados[file_id] = consulta
+                            return resultados
+                        else:
+                            return consulta_resultados
+
                 elif tabela == "SHEET":
                     consulta_resultados = cursor.fetchall()
                     return consulta_resultados
@@ -184,33 +193,54 @@ def consultaSQL(tipo: str, tabela: str, *where: str, **colunas_dados: str) -> di
                 if not colunas_dados:
                     raise ValueError("Nenhuma coluna para atualizar foi informada.")
 
-                # Monta SET: `col` = %s
-                set_cols = ", ".join([f"`{col}` = %s" for col in colunas_dados.keys()])
-
                 # Monta WHERE com pares (coluna, valor)
                 if len(where) == 0 or len(where) % 2 != 0:
                     raise ValueError("Parâmetros WHERE inválidos para UPDATE.")
 
-                where_parts: list[str] = []
-                valores_where: list[object] = []
+                where_parts: list[str] = []         # Partes do WHERE
+                valores_where: list[object] = []    # Valores para o WHERE
 
+                # Inicia em 0 e vai até len(where) em passos de 2
+                # Dessa forma, pega os pares (coluna, valor)
                 for i in range(0, len(where), 2):
                     where_coluna = str(where[i])
                     where_valor = where[i + 1]
                     where_parts.append(f"`{where_coluna}` = %s")
                     valores_where.append(where_valor)
 
-                where_clause = " AND ".join(where_parts)
+                if 'start_date' in colunas_dados and colunas_dados['start_date'] == 'NOW()':
+                    where_parts.append('(`start_date` IS NULL)')
+                if 'conclusion' in colunas_dados and colunas_dados['conclusion'] == '> 0 AND < 1':
+                    where_parts.append('(`conclusion` > 0 AND `conclusion` < 1)')
+                    del colunas_dados['conclusion']
+
+                if 'end_date' in colunas_dados and colunas_dados['end_date'] == 'NOW()':
+                    where_parts.append('(`end_date` IS NULL)')
+
+                # Monta SET: `col` = %s
+                set_cols: str = ", ".join([f"`{col}` = %s" for col in colunas_dados.keys()])
+
+                where_clause: str = " AND ".join(where_parts)
 
                 template_sql_query = Template("UPDATE `$tabela` SET $set_cols WHERE $where_clause")
                 sql_query = template_sql_query.safe_substitute(tabela=tabela, set_cols=set_cols, where_clause=where_clause)
 
+                colunas: tuple = ()
+                # Valores do SET
+                for valor in colunas_dados.values():
+                    if valor != '> 0 AND < 1':
+                        if valor == 'NOW()':
+                            colunas += (datetime.datetime.now(),)
+                        else:
+                            colunas += (valor,)
+
                 # Valores: primeiro os do SET, depois os do WHERE
-                params = tuple(colunas_dados.values()) + tuple(valores_where)
+                params = colunas + tuple(valores_where)
                 cursor.execute(sql_query, params)
                 connection.commit()
                 print(f"UPDATE {tabela} bem-sucedido! {cursor.rowcount} linha(s) afetada(s).")
                 return {"linhas_afetadas": cursor.rowcount}
+
             case "DELETE":
                 # Evitar que de alguma forma coloque * ou sem WHERE e apague tudo :/
                 if len(where) < 2 or len(where) % 2 != 0:

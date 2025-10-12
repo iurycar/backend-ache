@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify, session, send_from_directory, current_app
+from .tasks import calculate_delay, calculate_progress, rows_list
 from .from_to_mysql import to_mysql_inserir, from_mysql_extrair
 from werkzeug.utils import secure_filename
-from .db import consultaSQL, ENGINE
+from .db import consultaSQL
 from sqlalchemy import text
 from pathlib import Path
 import datetime
@@ -39,36 +40,8 @@ def save_metadata(id_file: str, filename: str, timestamp: str, id_team: str, pro
         id_team=id_team,
     )
 
-def duration_to_days(duration) -> int:
-    """Converte uma duração em dias para valor numérico. Remove 'dias' da string."""
-    
-    # Retorna 0 se duration for None ou vazio
-    if not duration or duration is None:
-        return 0
-    
-    # Se for um número, assume que já está em dias
-    if isinstance(duration, (int, float)):
-        try:
-            return int(float(duration))
-        except Exception:
-            return 0
-    
-    texto = str(duration).strip()
-
-    # Usa regex para encontrar o primeiro número na string
-    match = re.search(r'(\d+(?:[.,]\d+)?)', texto)
-
-    if not match:
-        return 0
-
-    try:
-        return int(float(match.group(1).replace(',', '.')))
-    except Exception:
-        return 0
-
 # Criação do Blueprint/Projeto da aplicação de upload/download de arquivos
 file_bp = Blueprint('file_bp', __name__)
-
 
 
 # Rota de upload de arquivos
@@ -154,31 +127,11 @@ def upload():
         to_mysql_inserir(id_file)
 
         # Atualiza start_date e end_date em lote (normalizando conclusion 0–1 ou 0–100)
-        try:
-            with ENGINE.begin() as conn:
-                conn.execute(text("UPDATE sheet SET start_date = NULL WHERE start_date = ''"))
-                conn.execute(text("UPDATE sheet SET end_date = NULL WHERE end_date = ''"))
+        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, conclusion='> 0 AND < 1', start_date='NOW()')
+        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'conclusion', 1, end_date='NOW()')
 
-                conn.execute(
-                    text("""
-                        UPDATE sheet SET 
-                        start_date = CASE WHEN (start_date IS NULL OR start_date = '')
-                                AND (
-                                    CASE WHEN COALESCE(conclusion,0) > 1 THEN COALESCE(conclusion,0)/100 
-                                        ELSE COALESCE(conclusion,0) END ) > 0 THEN NOW()
-                            ELSE start_date END,
-                        end_date = CASE
-                            WHEN (end_date IS NULL OR end_date = '')
-                                AND (
-                                    CASE WHEN COALESCE(conclusion,0) > 1 THEN COALESCE(conclusion,0)/100 
-                                        ELSE COALESCE(conclusion,0) END ) >= 1 THEN NOW()
-                            ELSE end_date END 
-                        WHERE id_file = :id_file
-                    """), 
-                    {"id_file": id_file}
-                )
-        except Exception as error:
-            print(f"Falha ao atualizar start/end_date em lote: {error}")
+        #UPDATE `sheet` SET `start_date` = NOW() WHERE (`start_date` IS NULL) AND (`conclusion` > 0 AND `conclusion` < 1) AND `id_file` = :id_file;
+    
         print(f"Arquivo {original_name} salvo com ID único {id_file} para o usuário {user_id}")
 
         return jsonify({
@@ -318,7 +271,7 @@ def send_data(id_file):
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        dados = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
+        data: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
             num=None,
             classe=None,
             category=None,
@@ -334,53 +287,17 @@ def send_data(id_file):
             responsible=None,
         )
 
-        # Converte datetime.datetime para ISO
-        # Calcula o atraso (em dias) para cada tarefa
-        # Não achei maneira mais eficiente de fazer isso :/
-        for linha in dados:
-            dt_valor = linha.get('start_date')
-
-            if not dt_valor or dt_valor == '' or dt_valor is None:
-                linha['atraso'] = 0
-                linha['start_date'] = None
-                continue
-
-            #print(f"Duração original para linha {linha.get('num')}: {linha.get('duration')}")
-
-            if isinstance(dt_valor, datetime.datetime):
-                dt_inicio = dt_valor
-            elif isinstance(dt_valor, str) and dt_valor.strip():
-                try:
-                    dt_inicio = datetime.datetime.fromisoformat(dt_valor)
-                except Exception:
-                    continue
-            else:
-                continue
-
-            dias: int = duration_to_days(linha.get('duration'))
-            prazo = (dt_inicio + datetime.timedelta(days=dias)).date()
-            dt_hoje = datetime.datetime.now(dt_inicio.tzinfo).date()
-
-            atraso = max((dt_hoje - prazo).days, 0)
-
-            dt_fim = dt_inicio + datetime.timedelta(days=dias)
-            dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
-
-            #print(f"Calculando atraso para linha {linha.get('num')}:")
-            #print(f"  Data de início: {dt_inicio}")
-            #print(f"  Data atual: {dt_hoje}")
-            #print(f"  Duração (dias): {dias}")
-            #print(f"  Data de fim calculada: {prazo}")
-
-            #print(f"Atraso calculado para linha {linha.get('num')}: {atraso} dias")
-            
-            linha['atraso'] = atraso
-            linha['start_date'] = linha['start_date'].isoformat()
-
-        if not dados:
+        if not data:
             return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
 
-        return jsonify({'dados': dados}), 200
+        completed: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file, completed=None)
+
+        if completed[0].get('completed', 0) == 0:        
+            data = calculate_delay(data)
+
+        print(f"\n\nCompleted data: {completed}\n\n")
+
+        return jsonify({'dados': data}), 200
 
     except Exception as error:
         print(f"Erro ao buscar todas as tarefas: {error}")
@@ -654,7 +571,13 @@ def projects_data():
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        consulta = consultaSQL('SELECT', 'PROJECT', )
+        data: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
+            duration=None,
+            conclusion=None,
+            start_date=None,
+            end_date=None,
+            responsible=None,
+        )
 
     except Exception as error:
         print(f"Erro ao buscar dados dos projetos: {error}")
@@ -785,4 +708,90 @@ def data_team():
         return jsonify({'employees': consulta}), 200
     except Exception as error:
         print(f"Erro ao buscar funcionários do time: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+
+
+# Rota para buscar o progresso das tarefas do projeto
+@file_bp.route('/project/progress_tasks/<id_file>', methods=['GET'])
+def project_progress_tasks(id_file: str):
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+
+        # Retornar progresso = {'total': X, 'concluidas': Y, 'em andamento': Z, 'não iniciadas': W, 'atrasadas': V}
+        progresso = {
+            'total': 0,
+            'concluded': 0,
+            'in_progress': 0,
+            'not_started': 0,
+            'overdue': 0
+        }
+
+        all_projects = (not id_file) or (id_file.strip() == '') or (id_file == None) or (id_file.lower() == 'null')
+
+        if all_projects:
+            # Quer dizer que o usuário quer o progresso de todos os projetos ativos do time
+            # Então eu preciso pegar todos os projetos ativos do time
+            consulta_projetos: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team,
+                completed=None,
+                id_file=None,
+                project_name=None
+            )
+
+            project_rows = rows_list(consulta_projetos)
+
+            if not project_rows:
+                return jsonify({"mensagem": "Nenhum projeto ativo encontrado para este time."}), 404
+
+            print(f"Projetos ativos encontrados para o time {id_team}: {consulta_projetos}")
+
+            for projeto in project_rows:
+                print(f"\nCalculando progresso para o projeto {projeto['project_name']}\n")
+                pid = projeto.get('id_file')
+                
+                if not pid:
+                    print(f"Projeto sem id_file: {projeto}")
+                    continue
+
+                if int(projeto.get('completed', 0) or 0) == 1:
+                    consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', projeto['id_file'], "COUNT(*)")
+                    
+                    if consulta_tarefas:
+                        total = int(consulta_tarefas[0].get('COUNT(*)', 0) or 0)
+                        progresso['total'] += total
+                        progresso['concluded'] += total
+                    continue
+
+                progresso = calculate_progress(projeto['id_file'], progresso)
+
+        else: 
+            # Se o id_file foi fornecido, então eu pego o progresso só daquele projeto
+            consulta_projeto: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team, 'id_file', id_file,
+                completed=None,
+                id_file=None,
+                project_name=None
+            )
+
+            if not consulta_projeto:
+                return jsonify({"mensagem": "Projeto não encontrado para este time."}), 404
+
+            print(f"Projeto ativo encontrado para o time {id_team}: {consulta_projeto}")
+
+            if consulta_projeto[id_file].get('completed', 0) == 1:
+                consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, "COUNT(*)")
+                
+                if consulta_tarefas:
+                    progresso['total'] += consulta_tarefas[id_file].get('COUNT(*)', 0)
+                    progresso['concluded'] += consulta_tarefas[id_file].get('COUNT(*)', 0)
+            else:
+                progresso = calculate_progress(id_file, progresso)
+
+        return jsonify({"progresso": progresso}), 200
+            
+
+    except Exception as error:
+        print(f"Erro ao buscar progresso das tarefas do projeto: {error}")
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
