@@ -3,7 +3,6 @@ use `ache_db`;
 
 drop table if exists `SHEET`;
 drop table if exists `PROJECT`;
-drop table if exists `TASK_HISTORY`;
 drop table if exists `EMPLOYEE`;
 drop table if exists `TEAMS`;
 drop table if exists `ADDRESS`;
@@ -57,25 +56,13 @@ describe `EMPLOYEE`;
 
 -- Projetos e Planilhas (TAREFAS)
 
-create table `TASK_HISTORY` (
-			`id_history`	smallint		not null	auto_increment,
-            `completed`		smallint		not null	default 0,
-            `in_progress` 	smallint		not null	default 0,
-            `user_id`		varchar(40)		not null,
-			constraint task_id_pk primary key(`id_history`)
-);
-
-alter table `TASK_HISTORY`
-add constraint `task_emp_id`
-foreign key(`user_id`)
-references `employee` (`user_id`);
-
 create table `PROJECT` (
 			`id_file`		varchar(50)		not null,
             `original_name`	varchar(100)	not null,
             `import_date`	datetime		not null,
             `project_name`  varchar(20)		not null,
             `completed`		boolean			default		0,
+            `end_date`		datetime,
             `id_team`		varchar(40)		not null,
             constraint project_id_pk primary key(`id_file`)
 );
@@ -99,10 +86,10 @@ create table `SHEET` (
             `text`				varchar(12)		not null,
             `reference`			varchar(12)		not null,
             `conclusion`		double			not null,
-            `responsible`		varchar(120),
             `start_date` 		datetime,
             `end_date` 			datetime,
             `id_file`			varchar(50)		not null,
+            `user_id`			varchar(40),
             constraint sheet_id_pk primary key(`id_task`)
 );
 
@@ -110,6 +97,11 @@ alter table `SHEET`
 add constraint `sheet_proj_fk`
 foreign key (`id_file`)
 references `PROJECT` (`id_file`);
+
+alter table `SHEET`
+add constraint `sheet_emp_fk`
+foreign key (`user_id`)
+references `EMPLOYEE` (`user_id`);
 
 describe `sheet`;
 
@@ -138,15 +130,3 @@ values ('b8460203-63b6-49ff-85e2-9e3be1ea20f9', 'usuario3@empresa.com.br', '$2b$
 
 insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `first_name`, `last_name`, `role`, `cellphone`, `active`, `id_team`, `id_address`)
 values ('7bdd3008-26c9-4e83-9317-6e98628819ca', 'usuario4@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Sicrano', 'Beltrano Fulano de Oliveira', 'admin', '+55 11 99032-4125', TRUE, '061a1547-dd09-4cc7-99e8-4b03b5be7d4b', 2);
-
-insert into `TASK_HISTORY` (`user_id`)
-values ('806443c5-9271-464a-a1da-4581c7f766e4');
-
-insert into `TASK_HISTORY` (`user_id`)
-values ('983143c5-5471-483g-a2db-7284d3a754pa');
-
-insert into `TASK_HISTORY` (`user_id`)
-values ('b8460203-63b6-49ff-85e2-9e3be1ea20f9');
-
-insert into `TASK_HISTORY` (`user_id`)
-values ('7bdd3008-26c9-4e83-9317-6e98628819ca');

@@ -1,4 +1,5 @@
 from .db import consultaSQL
+from typing import Optional
 import datetime
 import re
 
@@ -79,6 +80,78 @@ def calculate_delay(data: list[dict]) -> dict:
         row['start_date'] = row['start_date'].isoformat()
 
     return data
+
+def get_progress(id_file: str, id_team: str, user_id: Optional[str] = None) -> dict:
+
+    progresso = {
+        'total': 0,
+        'concluded': 0,
+        'not_started': 0,
+        'in_progress': 0,
+        'overdue': 0
+    }
+
+    # Se id_file for 'all' ou vazio, então pegar o progresso de todos os projetos ativos do time
+    all_projects = (not id_file) or (id_file.strip() == '') or (id_file == None) or (id_file.lower() == 'null')
+
+    if all_projects:
+
+        consulta_projetos: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team,
+            completed=None,
+            id_file=None,
+            project_name=None
+        )
+
+        # Transforma a lista de dicionários em uma lista simples de dicionários
+        project_rows = rows_list(consulta_projetos)
+
+        if not project_rows:
+            return jsonify({"mensagem": "Nenhum projeto ativo encontrado para este time."}), 404
+
+        # Para cada projeto, calcular o progresso
+        for projeto in project_rows:
+            pid = projeto.get('id_file') # Pega o id_file do projeto
+            
+            if not pid:
+                continue
+
+            # Se o projeto já estiver concluído, então todas as tarefas estão concluídas
+            if int(projeto.get('completed', 0) or 0) == 1:
+                consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', projeto['id_file'], "COUNT(*)")
+                
+                if consulta_tarefas:
+                    total = int(consulta_tarefas[0].get('COUNT(*)', 0) or 0)
+                    progresso['total'] += total
+                    progresso['concluded'] += total
+                continue
+
+            # Se o projeto não estiver concluído, calcular o progresso normalmente
+            progresso = calculate_progress(projeto['id_file'], progresso)
+
+    else: 
+        # Se o id_file foi fornecido, então pega o progresso somente daquele projeto
+        consulta_projeto: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team, 'id_file', id_file,
+            completed=None,
+            id_file=None,
+            project_name=None
+        )
+
+        if not consulta_projeto:
+            return jsonify({"mensagem": "Projeto não encontrado para este time."}), 404
+
+        print(f"Projeto ativo encontrado para o time {id_team}: {consulta_projeto}")
+
+        # Se o projeto já estiver concluído, então todas as tarefas estão concluídas
+        if int(consulta_projeto[id_file].get('completed', 0)) == 1:
+            consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, "COUNT(*)")
+            
+            if consulta_tarefas:
+                progresso['total'] += consulta_tarefas[0].get('COUNT(*)', 0)
+                progresso['concluded'] += consulta_tarefas[0].get('COUNT(*)', 0)
+        else:
+            progresso = calculate_progress(id_file, progresso)
+
+    return progresso
 
 def calculate_progress(id_file: str, progress: dict) -> dict:
     consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, "COUNT(*)")
