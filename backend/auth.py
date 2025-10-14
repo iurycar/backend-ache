@@ -8,13 +8,18 @@ from pathlib import Path
 """
 
 def consulta_db(email: str) -> dict | None:
-    resultado = consultaSQL("SELECT", "EMPLOYEE", 'email', email,
-    user_id=None,
-    password_hash=None,
-    first_name=None,
-    last_name=None,
-    role=None,
-    id_team=None)
+    resultado = consultaSQL(
+        "SELECT", "EMPLOYEE", 
+        where={'email': email},
+        colunas_dados={
+            'user_id': None,
+            'password_hash': None,
+            'first_name': None,
+            'last_name': None,
+            'role': None,
+            'id_team': None
+        }
+    )
 
     return resultado
 
@@ -30,30 +35,35 @@ def login():
 
     users_db: dict = consulta_db(email)   # Consulta o banco de dados pelo email
 
-    user_dados: dict = users_db.get(email)   # Verifica se o email existe no banco de dados
-    
-    # Verifica se a senha está correta
-    same = checkPassword(password, user_dados['password_hash'])
+    print(f"\nUsuários encontrados: {users_db}\n")
 
-    if user_dados and same:
-        session['user_id'] = user_dados['user_id']
-        session['user_email'] = email
-        session['user_name'] = user_dados['first_name']
-        session['user_last_name'] = user_dados['last_name']
-        session['user_role'] = user_dados['role']
-        session['user_team'] = user_dados['id_team']
-        session.permanent = True
+    if users_db:
+        user_dados: dict = users_db[0]   # Verifica se o email existe no banco de dados
+        
+        print(f"Dados do usuário para {email}: {user_dados}")
 
-        print(f"Login bem-sucedido para o usuário: {user_dados['user_id']}")
-        return jsonify({
-            "mensagem": "Login bem-sucedido",
-            "user": {
-                "name": user_dados['first_name'],
-                "email": email,
-                "role": user_dados['role'],
-            }
-        }), 200
-    
+        # Verifica se a senha está correta
+        same = checkPassword(password, user_dados['password_hash'])
+
+        if user_dados and same:
+            session['user_id'] = user_dados['user_id']
+            session['user_email'] = email
+            session['user_name'] = user_dados['first_name']
+            session['user_last_name'] = user_dados['last_name']
+            session['user_role'] = user_dados['role']
+            session['user_team'] = user_dados['id_team']
+            session.permanent = True
+
+            print(f"Login bem-sucedido para o usuário: {user_dados['user_id']}")
+            return jsonify({
+                "mensagem": "Login bem-sucedido",
+                "user": {
+                    "name": user_dados['first_name'],
+                    "email": email,
+                    "role": user_dados['role'],
+                }
+            }), 200
+        
     print(f"Falha no login para o email: {email}")
     return jsonify({"mensagem": "Email e/ou senha incorretos."}), 401
 

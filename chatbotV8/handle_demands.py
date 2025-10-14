@@ -1,7 +1,6 @@
 from backend.from_to_mysql import from_mysql_extrair
 import google.generativeai as genai
 from .handle_tasks import add_task
-from backend.db import consultaSQL
 from pathlib import Path
 import pandas as pd
 import os

@@ -20,24 +20,30 @@ diretorio = Path(__file__).parent
 
 def load_metadata(id_team: str) -> "Dados do projeto":
     """ Carrega os metadados do arquivo do banco de dados. """
-    resultados = consultaSQL('SELECT', 'PROJECT', 
-        'id_team', id_team,         # SELECIONA ONDE (WHERE) ID_TEAM = ID_TEAM
-        id_file=None,               # OS ARGS KEY SÃO AS COLUNAS QUE EU QUERO QUE RETORNE
-        original_name=None,
-        import_date=None,
-        project_name=None,
-        id_team=None,
+    resultados = consultaSQL(
+        'SELECT', 'PROJECT',
+        where={'id_team': id_team},
+        colunas_dados={
+            'id_file': None,
+            'original_name': None,
+            'import_date': None,
+            'project_name': None,
+            'id_team': None,
+        }
     )
     return resultados
 
 def save_metadata(id_file: str, filename: str, timestamp: str, id_team: str, project_name: str) -> None:
     """ Salva os metadados do arquivo no banco de dados. """
-    consultaSQL('INSERT', 'PROJECT', 
-        id_file=id_file, 
-        original_name=filename, 
-        import_date=timestamp,
-        project_name=project_name, 
-        id_team=id_team,
+    consultaSQL(
+        'INSERT', 'PROJECT',
+        colunas_dados={
+            'id_file': id_file,
+            'original_name': filename,
+            'import_date': timestamp,
+            'project_name': project_name,
+            'id_team': id_team,
+        }
     )
 
 # Criação do Blueprint/Projeto da aplicação de upload/download de arquivos
@@ -75,9 +81,8 @@ def upload_file():
 
         consulta = consultaSQL(
             'SELECT', 'PROJECT', 
-            'original_name', original_name, 
-            'id_team', id_team, 
-            id_file=None
+            where={'original_name': original_name, 'id_team': id_team},
+            colunas_dados={'id_file': None}
         )
 
         # Se já existir um arquivo com o mesmo nome para o mesmo time, adiciona um sufixo numérico
@@ -115,9 +120,8 @@ def upload_file():
 
         consulta = consultaSQL(
             'SELECT', 'PROJECT', 
-            'project_name', project_name, 
-            'id_team', id_team, 
-            id_file=None
+            where={'project_name': project_name, 'id_team': id_team},
+            colunas_dados={'id_file': None}
         )
 
         # Se já existir um projeto com o mesmo nome para o mesmo time, adiciona um sufixo numérico
@@ -128,7 +132,7 @@ def upload_file():
         save_metadata(id_file, original_name, date, id_team, project_name)
 
         # Verifica se o id_file foi salvo corretamente no banco de dados
-        project_metadata = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file, id_file=None)
+        project_metadata = consultaSQL('SELECT', 'PROJECT', where={'id_file': id_file}, colunas_dados={'id_file': None})
         if not project_metadata:
             print(f"Erro: Metadados do arquivo {id_file} não foram salvos no banco de dados.")
             return jsonify({'mensagem': 'Erro ao salvar os metadados do arquivo.'}), 500
@@ -136,22 +140,24 @@ def upload_file():
         # Manda os dados da tabela para o MySQL
         to_mysql_inserir(id_file)
 
+        date = datetime.datetime.now().astimezone().isoformat()
+
         # Atualiza start_date e end_date em lote (normalizando conclusion 0–1 ou 0–100)
         consultaSQL(
             'UPDATE', 'SHEET', 
-            'id_file', id_file, 
-            conclusion='> 0 AND < 1', 
-            start_date='NOW()'
+            where={'id_file': id_file},
+            colunas_dados={'start_date': date},
+            where_especial={'start_date': 'IS NULL', 'conclusion': ['> 0', '< 1']}
         )
 
         consultaSQL(
             'UPDATE', 'SHEET', 
-            'id_file', id_file, 
-            'conclusion', 1, 
-            end_date='NOW()'
+            where={'id_file': id_file, 'conclusion': 1}, 
+            colunas_dados={'end_date': date},
+            where_especial={'end_date': 'IS NULL'}
         )
 
-        #UPDATE `sheet` SET `start_date` = NOW() WHERE (`start_date` IS NULL) AND (`conclusion` > 0 AND `conclusion` < 1) AND `id_file` = :id_file;
+        #UPDATE `sheet` SET `start_date` = date WHERE (`start_date` IS NULL) AND (`conclusion` > 0 AND `conclusion` < 1) AND `id_file` = id_file;
     
         print(f"Arquivo {original_name} salvo com ID único {id_file} para o usuário {user_id}")
 
@@ -162,7 +168,7 @@ def upload_file():
 
     except Exception as error:
         print(f"Erro ao fazer upload do arquivo: {error}")
-        return jsonify({'mensagem': f"Ocorreu um erro: {error}"}), 500
+        return jsonify({'mensagem': f"Ocorreu um erro."}), 500
 
 
 
@@ -201,7 +207,7 @@ def download_file(id_file: str):
         )
     except Exception as error:
         print(f"Erro ao fazer download do arquivo: {error}")
-        return jsonify({'mensagem': f"Ocorreu um erro: {error}"}), 501
+        return jsonify({'mensagem': f"Ocorreu um erro."}), 501
 
 
 
@@ -231,9 +237,9 @@ def delete_file(id_file: str):
         # Verifica se o arquivo existe no diretório
         if os.path.exists(arquivo_caminho):
             os.remove(arquivo_caminho)  # Deleta o arquivo do diretório
-            
-            consultaSQL('DELETE', 'SHEET', 'id_file', id_file) # Deleta todas as linhas com a mesma FK
-            consultaSQL('DELETE', 'PROJECT', 'id_file', id_file)  # Deleta os metadados do arquivo
+
+            consultaSQL('DELETE', 'SHEET', where={'id_file': id_file}) # Deleta todas as linhas com a mesma FK
+            consultaSQL('DELETE', 'PROJECT', where={'id_file': id_file})  # Deleta os metadados do arquivo
 
             print(f"Arquivo {id_file} excluído com sucesso.")
 
@@ -243,7 +249,7 @@ def delete_file(id_file: str):
 
     except Exception as error:
         print(f"Erro ao deletar o arquivo: {error}")
-        return jsonify({"mensagem": f"Ocorreu um erro: {error}"})
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
 
@@ -294,20 +300,22 @@ def get_data_sheet(id_file):
 
         data: list[dict] = consultaSQL(
             'SELECT', 'SHEET', 
-            'id_file', id_file,
-            num=None,
-            classe=None,
-            category=None,
-            phase=None,
-            status=None,
-            name=None,
-            duration=None,
-            text=None,
-            reference=None,
-            conclusion=None,
-            start_date=None,
-            end_date=None,
-            user_id=None,
+            where={'id_file': id_file},
+            colunas_dados={
+                'num': None,
+                'classe': None,
+                'category': None,
+                'phase': None,
+                'status': None,
+                'name': None,
+                'duration': None,
+                'text': None,
+                'reference': None,
+                'conclusion': None,
+                'start_date': None,
+                'end_date': None,
+                'user_id': None,
+            },
         )
 
         if not data:
@@ -318,9 +326,11 @@ def get_data_sheet(id_file):
             if id_user not in (None, '', 'null'):
                 user_info = consultaSQL(
                     'SELECT', 'EMPLOYEE', 
-                    'user_id', id_user,
-                    first_name=None,
-                    last_name=None,
+                    where={'user_id': id_user},
+                    colunas_dados={
+                        'first_name': None,
+                        'last_name': None,
+                    }
                 )
 
                 if user_info:
@@ -328,8 +338,8 @@ def get_data_sheet(id_file):
 
         completed: list[dict] = consultaSQL(
             'SELECT', 'PROJECT', 
-            'id_file', id_file, 
-            completed=None
+            where={'id_file': id_file},
+            colunas_dados={'completed': None}
         )
 
         if completed[0].get('completed', 0) == 0:        
@@ -358,20 +368,26 @@ def update_add_row(id_file: str, num: int):
 
         data = request.get_json(silent=True) or {} # Dados enviados na requisição
 
-        if 'responsavel' in data and 'responsible' not in data:
-            data['responsible'] = data.pop('responsavel')
+        print(f"\nDados recebidos para atualizar/Adicionar linha {num} do arquivo {id_file}: {data}\n")
+
+        if 'responsible' in data:
+            data['user_id'] = data.pop('responsible')
+
+        if data.get('user_id') in ('', 'null'):
+            data['user_id'] = None
 
         # Campos permitidos para atualização
         permitidos = {
             'num', 'classe', 'category', 'phase', 'status',
             'name', 'duration', 'text', 'reference', 'conclusion',
-            'responsible'
+            'user_id'
         }
 
         # Filtra apenas os campos permitidos
         update_args: dict = {}
         for key, value in data.items():
             if key not in permitidos:
+                print(f"\nCampo inválido para atualização: {key}")
                 return jsonify({"mensagem": f"Campo inválido para atualização: {key}"}), 400
             else:
                 update_args[key] = value
@@ -390,8 +406,8 @@ def update_add_row(id_file: str, num: int):
         if update_args.get('category') is None or update_args.get('category') == '':
             update_args['category'] = 'INDEFINIDO'
 
-        print("Update: ", data)
-        print("Update args: ", update_args)
+        print("\nUpdate: ", data)
+        print("\nUpdate args: ", update_args)
 
         # Normaliza conclusion (0-1)
         if 'conclusion' in update_args:
@@ -411,11 +427,11 @@ def update_add_row(id_file: str, num: int):
         # Verifica se a linha existe
         linha_existente = consultaSQL(
             'SELECT', 'SHEET', 
-            'id_file', id_file, 
-            'num', num,
-            id_file=None,
-            num=None
+            where={'id_file': id_file, 'num': num},
+            colunas_dados={'id_file': None, 'num': None}
         )
+
+        print(f"\nLinha existente: {linha_existente}")
 
         # Se a linha não existir, insere uma nova linha
         if not linha_existente:
@@ -423,9 +439,12 @@ def update_add_row(id_file: str, num: int):
             try:
                 max_result = consultaSQL(
                     'SELECT', 'SHEET', 
-                    'id_file', id_file, 
-                    'MAX(num)'
+                    where={'id_file': id_file}, 
+                    colunas_dados={},
+                    campo={'MAX': 'num'}
                 )
+
+                print("\nMax result:", max_result)
 
                 max_num: int = 0
                 if isinstance(max_result, list) and max_result:
@@ -437,20 +456,24 @@ def update_add_row(id_file: str, num: int):
 
             novo_num: int = max_num + 1
 
+            print(f"\nInserindo nova linha {novo_num} no arquivo {id_file} com: {update_args}\n")
+
             consultaSQL(
                 'INSERT', 'SHEET',
-                id_file = id_file,
-                num = novo_num,
-                classe = update_args.get('classe', ''),
-                category = update_args.get('category', ''),
-                phase = update_args.get('phase', ''),
-                status = (update_args.get('status', '') or '').strip().upper(),
-                name = update_args.get('name', ''),
-                duration = update_args.get('duration', ''),
-                text = "Texto."+str(novo_num),
-                reference = "Doc."+str(novo_num),
-                conclusion = update_args.get('conclusion', 0),
-                responsible = update_args.get('responsible', '')
+                colunas_dados= {
+                    'id_file': id_file,
+                    'num': novo_num,
+                    'classe': update_args.get('classe', ''),
+                    'category': update_args.get('category', ''),
+                    'phase': update_args.get('phase', ''),
+                    'status': (update_args.get('status', '') or '').strip().lower().capitalize(),
+                    'name': update_args.get('name', ''),
+                    'duration': update_args.get('duration', ''),
+                    'text': "Texto."+str(novo_num),
+                    'reference': "Doc."+str(novo_num),
+                    'conclusion': update_args.get('conclusion', 0),
+                    'user_id': update_args.get('user_id', '')
+                }
             )
 
             return jsonify({
@@ -463,9 +486,8 @@ def update_add_row(id_file: str, num: int):
             # Executa o UPDATE na linha alvo (chave: id_file + num atual)
             consultaSQL(
                 'UPDATE', 'SHEET', 
-                'id_file', id_file, 
-                'num', num, 
-                **update_args
+                where={'id_file': id_file, 'num': num},
+                colunas_dados=update_args
             )
 
         return jsonify({
@@ -475,7 +497,7 @@ def update_add_row(id_file: str, num: int):
 
     except Exception as error:
         print(f"Erro ao atualizar linha: {error}")
-        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
 # Rota para deletar uma linha da planilha
@@ -496,10 +518,8 @@ def delete_row(id_file: str, num: int):
         # Verifica se a linha existe
         linha_existente = consultaSQL(
             'SELECT', 'SHEET', 
-            'id_file', id_file, 
-            'num', num,
-            id_file=None,
-            num=None
+            where={'id_file': id_file, 'num': num},
+            colunas_dados={'id_file': None, 'num': None}
         )
 
         if not linha_existente:
@@ -508,15 +528,14 @@ def delete_row(id_file: str, num: int):
         # Executa o DELETE na linha alvo (chave: id_file + num atual)
         consultaSQL(
             'DELETE', 'SHEET', 
-            'id_file', id_file, 
-            'num', num
+            where={'id_file': id_file, 'num': num}
         )
 
         return jsonify({"mensagem": "Linha deletada com sucesso."}), 200
 
     except Exception as error:
         print(f"Erro ao deletar linha: {error}")
-        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
 # Rota para iniciar uma tarefa
@@ -537,11 +556,8 @@ def set_started_task(id_file: str, num: int):
         # Verifica se a linha existe
         linha_existente = consultaSQL(
             'SELECT', 'SHEET', 
-            'id_file', id_file, 
-            'num', num,
-            id_file=None,
-            num=None,
-            start_date=None
+            where={'id_file': id_file, 'num': num},
+            colunas_dados={'id_file': None, 'num': None, 'start_date': None}
         )
 
         if not linha_existente:
@@ -556,17 +572,15 @@ def set_started_task(id_file: str, num: int):
         # Atualiza o status da tarefa para "EM ANDAMENTO"
         consultaSQL(
             'UPDATE', 'SHEET', 
-            'id_file', id_file, 
-            'num', num, 
-            start_date=date, 
-            user_id=user_id,
+            where={'id_file': id_file, 'num': num},
+            colunas_dados={'start_date': date, 'user_id': user_id}
         )
 
         return jsonify({"mensagem": "Tarefa iniciada com sucesso."}), 200
 
     except Exception as error:
         print(f"Erro ao iniciar tarefa: {error}")
-        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
 # Rota para desfazer o início de uma tarefa
@@ -588,12 +602,13 @@ def set_undo_started_task(id_file: str, num: int):
         # Verifica se a linha existe
         linha_existente = consultaSQL(
             'SELECT', 'SHEET', 
-            'id_file', id_file, 
-            'num', num,
-            id_file=None,
-            num=None,
-            conclusion=None,
-            start_date=None
+            where={'id_file': id_file, 'num': num},
+            colunas_dados={
+                'id_file': None,
+                'num': None,
+                'conclusion': None,
+                'start_date': None
+            }
         )
 
         if not linha_existente:
@@ -609,17 +624,18 @@ def set_undo_started_task(id_file: str, num: int):
         # Define start_date como NULL
         consultaSQL(
             'UPDATE', 'SHEET', 
-            'id_file', id_file, 
-            'num', num, 
-            start_date=None, 
-            conclusion=0
+            where={'id_file': id_file, 'num': num},
+            colunas_dados={
+                'start_date': None, 
+                'conclusion': 0
+            }
         )
 
         return jsonify({"mensagem": "Início da tarefa removido com sucesso."}), 200
 
     except Exception as error:
         print(f"Erro ao desfazer início de tarefa: {error}")
-        return jsonify({"mensagem": f"Ocorreu um erro: {error}"}), 500
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
 @file_bp.route("/projects/data", methods=['GET'])
@@ -631,13 +647,19 @@ def get_projects_data():
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        data: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
-            duration=None,
-            conclusion=None,
-            start_date=None,
-            end_date=None,
-            responsible=None,
+        data: list[dict] = consultaSQL(
+            'SELECT', 'SHEET', 
+            where={'id_file': id_file},
+            colunas_dados={
+                'duration': None,
+                'conclusion': None,
+                'start_date': None,
+                'end_date': None,
+                'user_id': None,
+            }
         )
+
+        return jsonify({'data': data}), 200
 
     except Exception as error:
         print(f"Erro ao buscar dados dos projetos: {error}")
@@ -654,8 +676,8 @@ def set_project_completed(id_file: str):
 
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
-        
-        consulta: dict = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file, completed=None)
+
+        consulta: dict = consultaSQL('SELECT', 'PROJECT', where={'id_file': id_file}, colunas_dados={'completed': None})
         project_rows = rows_list(consulta)
 
         if not consulta:
@@ -664,15 +686,15 @@ def set_project_completed(id_file: str):
         if int(project_rows[0].get('completed', 0)) == 1:
             return jsonify({'mensagem': "O projeto já foi concluído."}), 200
 
-        consulta: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, conclusion=None, num=None)
+        consulta: list[dict] = consultaSQL('SELECT', 'SHEET', where={'id_file': id_file}, colunas_dados={'conclusion': None, 'num': None})
 
         for linha in consulta:
             if float(linha.get('conclusion', 0)) < 1:
                 return jsonify({'mensagem': f"A tarefa {linha.get('num')} ainda não foi concluída."}), 200
-        
-        consultaSQL('UPDATE', 'PROJECT', 'id_file', id_file, completed=1)
 
-        consulta: list[dict] = consultaSQL('SELECT', 'TEAMS', 'id_team', id_team, 'MAX(completed_projects)')
+        consultaSQL('UPDATE', 'PROJECT', where={'id_file': id_file}, colunas_dados={'completed': 1})
+
+        consulta: list[dict] = consultaSQL('SELECT', 'TEAMS', where={'id_team': id_team}, campo={'MAX': 'completed_projects'})
 
         max_completed: int = 0
         if isinstance(consulta, list) and consulta:
@@ -682,14 +704,16 @@ def set_project_completed(id_file: str):
 
         consultaSQL(
             'UPDATE', 'TEAMS', 
-            'id_team', id_team, 
-            completed_projects=max_completed
+            where={'id_team': id_team},
+            colunas_dados={'completed_projects': max_completed}
         )
+
+        date = datetime.datetime.now().astimezone().isoformat()
 
         consultaSQL(
             'UPDATE', 'PROJECT',
-            'id_file', id_file,
-            end_date='NOW()'
+            where={'id_file': id_file},
+            colunas_dados={'end_date': date}
         )
 
         print(f"Projeto {id_file} marcado como concluído.")
@@ -734,10 +758,12 @@ def get_team_employees():
         # Buscar todos os funcionários do time
         employees: list[dict] = consultaSQL(
             'SELECT', 'EMPLOYEE', 
-            'id_team', id_team, 
-            first_name=None, 
-            last_name=None,
-            user_id=None
+            where={'id_team': id_team}, 
+            colunas_dados={
+                'first_name': None, 
+                'last_name': None, 
+                'user_id': None
+            }
         )
 
         valid_response: list[dict] = []
@@ -778,13 +804,15 @@ def get_data_team():
         
         consulta: list[dict] = consultaSQL(
             'SELECT', 'EMPLOYEE', 
-            'id_team', id_team, 
-            email=None,
-            first_name=None,
-            last_name=None,
-            role=None,
-            cellphone=None,
-            active=None
+            where={'id_team': id_team}, 
+            colunas_dados={
+                'email': None,
+                'first_name': None,
+                'last_name': None,
+                'role': None,
+                'cellphone': None,
+                'active': None
+            }
         )
 
         if not consulta:
@@ -794,10 +822,12 @@ def get_data_team():
         for emp in consulta:
             consulta_address: list[dict] = consultaSQL(
                 'SELECT', 'ADDRESS', 
-                'user_id', emp.get('user_id'), 
-                city=None, 
-                state=None, 
-                country=None
+                where={'user_id': emp.get('user_id')}, 
+                colunas_dados={
+                    'city': None, 
+                    'state': None, 
+                    'country': None
+                }
             )
 
             if consulta_address:
@@ -824,10 +854,9 @@ def get_team_progress():
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
         completed_projects: list[dict] = consultaSQL(
-            'SELECT', 'PROJECT'
-            'id_team', id_team,
-            'COUNT(*)'
-            'completed', 1,
+            'SELECT', 'PROJECT',
+            where={'id_team': id_team, 'completed': 1},
+            campo={'COUNT': '*'}
         )
 
     except Exception as error:
@@ -857,26 +886,29 @@ def get_employee_tasks(id_employee: str, id_file: str):
             # Buscar todas as tarefas atribuídas ao funcionário no projeto especificado
             tarefas: list[dict] = consultaSQL(
                 'SELECT', 'SHEET', 
-                'id_file', id_file, 
-                'user_id', id_employee,
-                num=None,
-                name=None,
-                duration=None,
-                conclusion=None,
-                start_date=None,
-                end_date=None
+                where={'user_id': id_employee, 'id_file': id_file},
+                colunas_dados={
+                    'num': None,
+                    'name': None,
+                    'duration': None,
+                    'conclusion': None,
+                    'start_date': None,
+                    'end_date': None
+                }
             )
         else:
             # Buscar todas as tarefas atribuídas ao funcionário em todos os projetos do time
             tarefas: list[dict] = consultaSQL(
                 'SELECT', 'SHEET',
-                'user_id', id_employee,
-                num=None,
-                name=None,
-                duration=None,
-                conclusion=None,
-                start_date=None,
-                end_date=None
+                where={'user_id': id_employee},
+                colunas_dados={
+                    'num': None,
+                    'name': None,
+                    'duration': None,
+                    'conclusion': None,
+                    'start_date': None,
+                    'end_date': None
+                }
             )
 
         if not tarefas:
@@ -885,9 +917,10 @@ def get_employee_tasks(id_employee: str, id_file: str):
         if id_file != 'null':
             completed = consultaSQL(
                 'SELECT', 'PROJECT', 
-                'id_file', id_file, 
-                completed=None
+                where={'id_file': id_file, 'user_id': id_employee}, 
+                colunas_dados={'completed': None}
             )
+
             if completed and completed[0].get('completed', 0) == 0:
                 tarefas = calculate_delay(tarefas)
         else:
