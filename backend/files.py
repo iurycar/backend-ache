@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, session, send_from_directory, current_app
-from .tasks import calculate_delay, calculate_progress, rows_list
 from .from_to_mysql import to_mysql_inserir, from_mysql_extrair
+from .tasks import calculate_delay, get_progress, rows_list
 from werkzeug.utils import secure_filename
 from .db import consultaSQL
 from sqlalchemy import text
@@ -46,7 +46,7 @@ file_bp = Blueprint('file_bp', __name__)
 
 # Rota de upload de arquivos
 @file_bp.route('/upload', methods=['POST'])
-def upload():
+def upload_file():
     try:
         # O ID servirá para garantir que não haja conflito entre as requisições dos usuários
         user_id = session.get('user_id')
@@ -73,7 +73,12 @@ def upload():
         # Torna o nome do arquivo seguro e o armazena
         original_name: str = secure_filename(arquivo.filename)
 
-        consulta = consultaSQL('SELECT', 'PROJECT', 'original_name', original_name, 'id_team', id_team, id_file=None)
+        consulta = consultaSQL(
+            'SELECT', 'PROJECT', 
+            'original_name', original_name, 
+            'id_team', id_team, 
+            id_file=None
+        )
 
         # Se já existir um arquivo com o mesmo nome para o mesmo time, adiciona um sufixo numérico
         if consulta:
@@ -108,7 +113,12 @@ def upload():
         elif not match and not match2:
             project_name = "Sem Nome"
 
-        consulta = consultaSQL('SELECT', 'PROJECT', 'project_name', project_name, 'id_team', id_team, id_file=None)
+        consulta = consultaSQL(
+            'SELECT', 'PROJECT', 
+            'project_name', project_name, 
+            'id_team', id_team, 
+            id_file=None
+        )
 
         # Se já existir um projeto com o mesmo nome para o mesmo time, adiciona um sufixo numérico
         if consulta:
@@ -127,8 +137,19 @@ def upload():
         to_mysql_inserir(id_file)
 
         # Atualiza start_date e end_date em lote (normalizando conclusion 0–1 ou 0–100)
-        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, conclusion='> 0 AND < 1', start_date='NOW()')
-        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'conclusion', 1, end_date='NOW()')
+        consultaSQL(
+            'UPDATE', 'SHEET', 
+            'id_file', id_file, 
+            conclusion='> 0 AND < 1', 
+            start_date='NOW()'
+        )
+
+        consultaSQL(
+            'UPDATE', 'SHEET', 
+            'id_file', id_file, 
+            'conclusion', 1, 
+            end_date='NOW()'
+        )
 
         #UPDATE `sheet` SET `start_date` = NOW() WHERE (`start_date` IS NULL) AND (`conclusion` > 0 AND `conclusion` < 1) AND `id_file` = :id_file;
     
@@ -147,7 +168,7 @@ def upload():
 
 # Rota de download de arquivos
 @file_bp.route('/download/<id_file>', methods=['GET'])
-def download(id_file: str):
+def download_file(id_file: str):
     try:
         # Pega o user_id da sessão
         user_id = session.get('user_id')
@@ -186,7 +207,7 @@ def download(id_file: str):
 
 # Rota para deletar algum arquivo solicitado
 @file_bp.route('/delete/<id_file>', methods=['DELETE'])
-def delete(id_file: str):
+def delete_file(id_file: str):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -228,13 +249,13 @@ def delete(id_file: str):
 
 # Rota para solicitar os arquivos do usuário
 @file_bp.route('/arquivos_usuario', methods=['GET'])
-def arquivos_usuario():
+def get_user_files():
     arquivos: list[dict] = []
 
     user_id = session.get('user_id')
     id_team = session.get('user_team')
 
-    print(f"Recebendo requisição para 'arquivos_usuario'. User ID na sessão: {user_id}")
+    print(f"Recebendo requisição para 'get_files'. User ID na sessão: {user_id}")
 
     if (not id_team or not user_id) or (id_team is None or user_id is None):
         return jsonify({'arquivos': arquivos})
@@ -260,18 +281,20 @@ def arquivos_usuario():
 
 
 @file_bp.route('/arquivo/<id_file>/dados', methods=['GET'])
-def send_data(id_file):
+def get_data_sheet(id_file):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
-        print(f"Recebendo requisição para 'send_data'. User ID na sessão: {user_id}")
+        print(f"Recebendo requisição para 'get_data_sheet'. User ID na sessão: {user_id}")
         print(f"ID do time na sessão: {id_team}")
 
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        data: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file,
+        data: list[dict] = consultaSQL(
+            'SELECT', 'SHEET', 
+            'id_file', id_file,
             num=None,
             classe=None,
             category=None,
@@ -284,13 +307,30 @@ def send_data(id_file):
             conclusion=None,
             start_date=None,
             end_date=None,
-            responsible=None,
+            user_id=None,
         )
 
         if not data:
             return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
 
-        completed: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_file', id_file, completed=None)
+        for task in data:
+            id_user = task.get('user_id')
+            if id_user not in (None, '', 'null'):
+                user_info = consultaSQL(
+                    'SELECT', 'EMPLOYEE', 
+                    'user_id', id_user,
+                    first_name=None,
+                    last_name=None,
+                )
+
+                if user_info:
+                    task['responsible'] = f"{user_info[0].get('first_name', '')} {user_info[0].get('last_name', '')}".strip()
+
+        completed: list[dict] = consultaSQL(
+            'SELECT', 'PROJECT', 
+            'id_file', id_file, 
+            completed=None
+        )
 
         if completed[0].get('completed', 0) == 0:        
             data = calculate_delay(data)
@@ -369,7 +409,10 @@ def update_add_row(id_file: str, num: int):
             return jsonify({"mensagem": "Nada para atualizar."}), 400
         
         # Verifica se a linha existe
-        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+        linha_existente = consultaSQL(
+            'SELECT', 'SHEET', 
+            'id_file', id_file, 
+            'num', num,
             id_file=None,
             num=None
         )
@@ -378,7 +421,12 @@ def update_add_row(id_file: str, num: int):
         if not linha_existente:
             # calcular próximo número de linha para este arquivo
             try:
-                max_result = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'MAX(num)')
+                max_result = consultaSQL(
+                    'SELECT', 'SHEET', 
+                    'id_file', id_file, 
+                    'MAX(num)'
+                )
+
                 max_num: int = 0
                 if isinstance(max_result, list) and max_result:
                     # chave pode ser 'MAX(num)' dependendo do SELECT
@@ -389,7 +437,8 @@ def update_add_row(id_file: str, num: int):
 
             novo_num: int = max_num + 1
 
-            consultaSQL('INSERT', 'SHEET',
+            consultaSQL(
+                'INSERT', 'SHEET',
                 id_file = id_file,
                 num = novo_num,
                 classe = update_args.get('classe', ''),
@@ -412,7 +461,12 @@ def update_add_row(id_file: str, num: int):
             print(f"Atualizando linha {num} do arquivo {id_file} com: {update_args}")
 
             # Executa o UPDATE na linha alvo (chave: id_file + num atual)
-            consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, **update_args)
+            consultaSQL(
+                'UPDATE', 'SHEET', 
+                'id_file', id_file, 
+                'num', num, 
+                **update_args
+            )
 
         return jsonify({
             "mensagem": "Linha atualizada com sucesso.",
@@ -440,7 +494,10 @@ def delete_row(id_file: str, num: int):
             return jsonify({"mensagem": "Arquivo não encontrado."}), 404
 
         # Verifica se a linha existe
-        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+        linha_existente = consultaSQL(
+            'SELECT', 'SHEET', 
+            'id_file', id_file, 
+            'num', num,
             id_file=None,
             num=None
         )
@@ -449,7 +506,11 @@ def delete_row(id_file: str, num: int):
             return jsonify({"mensagem": "Linha não encontrada."}), 404
 
         # Executa o DELETE na linha alvo (chave: id_file + num atual)
-        consultaSQL('DELETE', 'SHEET', 'id_file', id_file, 'num', num)
+        consultaSQL(
+            'DELETE', 'SHEET', 
+            'id_file', id_file, 
+            'num', num
+        )
 
         return jsonify({"mensagem": "Linha deletada com sucesso."}), 200
 
@@ -460,12 +521,10 @@ def delete_row(id_file: str, num: int):
 
 # Rota para iniciar uma tarefa
 @file_bp.route('/arquivo/<id_file>/start/<int:num>', methods=['POST'])
-def start_task(id_file: str, num: int):
+def set_started_task(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
-        user_name = session.get('user_name', 'Usuário')
-        user_last_name = session.get('user_last_name', '')
 
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
@@ -476,7 +535,10 @@ def start_task(id_file: str, num: int):
             return jsonify({"mensagem": "Arquivo não encontrado."}), 404
 
         # Verifica se a linha existe
-        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+        linha_existente = consultaSQL(
+            'SELECT', 'SHEET', 
+            'id_file', id_file, 
+            'num', num,
             id_file=None,
             num=None,
             start_date=None
@@ -491,23 +553,14 @@ def start_task(id_file: str, num: int):
 
         date = datetime.datetime.now().astimezone().isoformat()
 
-        responsible_name = user_name + " " + user_last_name
-
         # Atualiza o status da tarefa para "EM ANDAMENTO"
-        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=date, responsible=responsible_name)
-
-        consulta: list[dict] = consultaSQL('SELECT', 'TASK_HISTORY', 'user_id', user_id, "MAX(in_progress)")
-
-        print("Consulta de histórico:", consulta)
-
-        max_in_progress: int = 0
-        if isinstance(consulta, list) and consulta:
-            row: dict = consulta[0]
-            max_in_progress = int(row.get('MAX(in_progress)', 0) or 0)
-        max_in_progress += 1
-
-        # Registra o início da tarefa no histórico
-        consultaSQL('UPDATE', 'TASK_HISTORY', 'user_id', user_id, in_progress=max_in_progress)
+        consultaSQL(
+            'UPDATE', 'SHEET', 
+            'id_file', id_file, 
+            'num', num, 
+            start_date=date, 
+            user_id=user_id,
+        )
 
         return jsonify({"mensagem": "Tarefa iniciada com sucesso."}), 200
 
@@ -518,7 +571,7 @@ def start_task(id_file: str, num: int):
 
 # Rota para desfazer o início de uma tarefa
 @file_bp.route('/arquivo/<id_file>/start/<int:num>', methods=['DELETE'])
-def undo_start_task(id_file: str, num: int):
+def set_undo_started_task(id_file: str, num: int):
     """Remove o start_date (volta tarefa para 'não iniciada' em termos de início)."""
     try:
         user_id = session.get('user_id')
@@ -533,7 +586,10 @@ def undo_start_task(id_file: str, num: int):
             return jsonify({"mensagem": "Arquivo não encontrado."}), 404
 
         # Verifica se a linha existe
-        linha_existente = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, 'num', num,
+        linha_existente = consultaSQL(
+            'SELECT', 'SHEET', 
+            'id_file', id_file, 
+            'num', num,
             id_file=None,
             num=None,
             conclusion=None,
@@ -551,7 +607,13 @@ def undo_start_task(id_file: str, num: int):
             return jsonify({"mensagem": "A tarefa já foi concluída; não é possível desfazer o início."}), 400
 
         # Define start_date como NULL
-        consultaSQL('UPDATE', 'SHEET', 'id_file', id_file, 'num', num, start_date=None, conclusion=0)
+        consultaSQL(
+            'UPDATE', 'SHEET', 
+            'id_file', id_file, 
+            'num', num, 
+            start_date=None, 
+            conclusion=0
+        )
 
         return jsonify({"mensagem": "Início da tarefa removido com sucesso."}), 200
 
@@ -561,7 +623,7 @@ def undo_start_task(id_file: str, num: int):
 
 
 @file_bp.route("/projects/data", methods=['GET'])
-def projects_data():
+def get_projects_data():
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -583,7 +645,7 @@ def projects_data():
 
 
 @file_bp.route("/projects/completed/<id_file>", methods=['GET'])
-def project_completed(id_file: str):
+def set_project_completed(id_file: str):
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -618,7 +680,17 @@ def project_completed(id_file: str):
             max_completed = int(row.get('MAX(completed_projects)', 0) or 0) # Se for None, usa 0        
         max_completed += 1
 
-        consultaSQL('UPDATE', 'TEAMS', 'id_team', id_team, completed_projects=max_completed)
+        consultaSQL(
+            'UPDATE', 'TEAMS', 
+            'id_team', id_team, 
+            completed_projects=max_completed
+        )
+
+        consultaSQL(
+            'UPDATE', 'PROJECT',
+            'id_file', id_file,
+            end_date='NOW()'
+        )
 
         print(f"Projeto {id_file} marcado como concluído.")
 
@@ -628,9 +700,30 @@ def project_completed(id_file: str):
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
+# Rota para buscar o progresso das tarefas do projeto
+@file_bp.route('/project/progress_tasks/<id_file>', methods=['GET'])
+def get_tasks_project_progress(id_file: str):
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+
+        # Retornar progresso = {'total': X, 'concluidas': Y, 'em andamento': Z, 'não iniciadas': W, 'atrasadas': V}
+
+        progresso: dict = get_progress(id_file, id_team)
+
+        return jsonify({"progresso": progresso}), 200
+
+    except Exception as error:
+        print(f"Erro ao buscar progresso das tarefas do projeto: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+
+
 # Rota para buscar os funcionários do time
 @file_bp.route('/team/employees', methods=['GET'])
-def team_employees():
+def get_team_employees():
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -639,27 +732,35 @@ def team_employees():
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         # Buscar todos os funcionários do time
-        employees: list[dict] = consultaSQL('SELECT', 'EMPLOYEE', 'id_team', id_team, first_name=None, last_name=None)
+        employees: list[dict] = consultaSQL(
+            'SELECT', 'EMPLOYEE', 
+            'id_team', id_team, 
+            first_name=None, 
+            last_name=None,
+            user_id=None
+        )
 
-        valid_employees: list[dict] = []
+        valid_response: list[dict] = []
 
         # Filtra apenas os funcionários com nome e sobrenome válidos
         for emp in employees:
-            complete_name: dict = {}
+            name_and_id: dict = {}
             first_name: str = emp.get('first_name', '').strip()
             last_name: str = emp.get('last_name', '').strip()
+            id_employee: str = emp.get('user_id', '').strip()
 
             if first_name and last_name:
-                complete_name['name'] = f"{first_name} {last_name}"
+                name_and_id['name'] = f"{first_name} {last_name}"
             elif first_name:
-                complete_name['name'] = first_name
+                name_and_id['name'] = first_name
 
-            if complete_name:
-                valid_employees.append(complete_name)
+            if name_and_id:
+                name_and_id['id'] = id_employee
+                valid_response.append(name_and_id)
 
-        print(f"Funcionários encontrados para o time {id_team}: {valid_employees}")
+        print(f"Funcionários encontrados para o time {id_team}: {valid_response}")
 
-        return jsonify({'employees': valid_employees}), 200
+        return jsonify({'employees': valid_response}), 200
     except Exception as error:
         print(f"Erro ao buscar funcionários do time: {error}")
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
@@ -667,7 +768,7 @@ def team_employees():
 
 # Rota para buscar dados dos funcionários do time
 @file_bp.route('/team/info', methods=['POST'])
-def data_team():
+def get_data_team():
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -675,7 +776,9 @@ def data_team():
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
-        consulta: list[dict] = consultaSQL('SELECT', 'EMPLOYEE', 'id_team', id_team, 
+        consulta: list[dict] = consultaSQL(
+            'SELECT', 'EMPLOYEE', 
+            'id_team', id_team, 
             email=None,
             first_name=None,
             last_name=None,
@@ -689,7 +792,9 @@ def data_team():
         
         # Para cada funcionário, buscar o endereço
         for emp in consulta:
-            consulta_address: list[dict] = consultaSQL('SELECT', 'ADDRESS', 'user_id', emp.get('user_id'), 
+            consulta_address: list[dict] = consultaSQL(
+                'SELECT', 'ADDRESS', 
+                'user_id', emp.get('user_id'), 
                 city=None, 
                 state=None, 
                 country=None
@@ -709,88 +814,97 @@ def data_team():
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
-# Rota para buscar o progresso das tarefas do projeto
-@file_bp.route('/project/progress_tasks/<id_file>', methods=['GET'])
-def project_progress_tasks(id_file: str):
+@file_bp.route('/team/progress', methods=['GET'])
+def get_team_progress():
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
 
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
-
-        # Retornar progresso = {'total': X, 'concluidas': Y, 'em andamento': Z, 'não iniciadas': W, 'atrasadas': V}
-        progresso = {
-            'total': 0,
-            'concluded': 0,
-            'in_progress': 0,
-            'not_started': 0,
-            'overdue': 0
-        }
-
-        # Se id_file for 'all' ou vazio, então pegar o progresso de todos os projetos ativos do time
-        all_projects = (not id_file) or (id_file.strip() == '') or (id_file == None) or (id_file.lower() == 'null')
-
-        if all_projects:
-
-            consulta_projetos: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team,
-                completed=None,
-                id_file=None,
-                project_name=None
-            )
-
-            # Transforma a lista de dicionários em uma lista simples de dicionários
-            project_rows = rows_list(consulta_projetos)
-
-            if not project_rows:
-                return jsonify({"mensagem": "Nenhum projeto ativo encontrado para este time."}), 404
-
-            # Para cada projeto, calcular o progresso
-            for projeto in project_rows:
-                pid = projeto.get('id_file') # Pega o id_file do projeto
-                
-                if not pid:
-                    continue
-
-                # Se o projeto já estiver concluído, então todas as tarefas estão concluídas
-                if int(projeto.get('completed', 0) or 0) == 1:
-                    consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', projeto['id_file'], "COUNT(*)")
-                    
-                    if consulta_tarefas:
-                        total = int(consulta_tarefas[0].get('COUNT(*)', 0) or 0)
-                        progresso['total'] += total
-                        progresso['concluded'] += total
-                    continue
-
-                # Se o projeto não estiver concluído, calcular o progresso normalmente
-                progresso = calculate_progress(projeto['id_file'], progresso)
-
-        else: 
-            # Se o id_file foi fornecido, então pega o progresso somente daquele projeto
-            consulta_projeto: list[dict] = consultaSQL('SELECT', 'PROJECT', 'id_team', id_team, 'id_file', id_file,
-                completed=None,
-                id_file=None,
-                project_name=None
-            )
-
-            if not consulta_projeto:
-                return jsonify({"mensagem": "Projeto não encontrado para este time."}), 404
-
-            print(f"Projeto ativo encontrado para o time {id_team}: {consulta_projeto}")
-
-            # Se o projeto já estiver concluído, então todas as tarefas estão concluídas
-            if int(consulta_projeto[id_file].get('completed', 0)) == 1:
-                consulta_tarefas: list[dict] = consultaSQL('SELECT', 'SHEET', 'id_file', id_file, "COUNT(*)")
-                
-                if consulta_tarefas:
-                    progresso['total'] += consulta_tarefas[0].get('COUNT(*)', 0)
-                    progresso['concluded'] += consulta_tarefas[0].get('COUNT(*)', 0)
-            else:
-                progresso = calculate_progress(id_file, progresso)
-
-        return jsonify({"progresso": progresso}), 200
-            
+        
+        completed_projects: list[dict] = consultaSQL(
+            'SELECT', 'PROJECT'
+            'id_team', id_team,
+            'COUNT(*)'
+            'completed', 1,
+        )
 
     except Exception as error:
-        print(f"Erro ao buscar progresso das tarefas do projeto: {error}")
+        print(f"Erro ao buscar progresso do time: {error}")
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+
+
+# Rota para buscar as tarefas atribuídas a um funcionário específico
+@file_bp.route('/employee/tasks/<id_employee>/<id_file>', methods=['GET'])
+def get_employee_tasks(id_employee: str, id_file: str):
+    try:
+        user_id = session.get('user_id')
+        id_team = session.get('user_team')
+
+        if (not user_id or not id_team) or (user_id is None or id_team is None):
+            return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
+        
+        if not id_employee or id_employee.strip() in ('', 'null', 'undefined'):
+            return jsonify({"mensagem": "ID do funcionário inválido."}), 400
+
+        if not id_file or id_file.strip() in ('', 'undefined'):
+            return jsonify({"mensagem": "ID do arquivo inválido."}), 400
+
+        print(f"Buscando tarefas para o funcionário '{id_employee}' no projeto '{id_file}' do time '{id_team}'")
+
+        if id_file != 'null':
+            # Buscar todas as tarefas atribuídas ao funcionário no projeto especificado
+            tarefas: list[dict] = consultaSQL(
+                'SELECT', 'SHEET', 
+                'id_file', id_file, 
+                'user_id', id_employee,
+                num=None,
+                name=None,
+                duration=None,
+                conclusion=None,
+                start_date=None,
+                end_date=None
+            )
+        else:
+            # Buscar todas as tarefas atribuídas ao funcionário em todos os projetos do time
+            tarefas: list[dict] = consultaSQL(
+                'SELECT', 'SHEET',
+                'user_id', id_employee,
+                num=None,
+                name=None,
+                duration=None,
+                conclusion=None,
+                start_date=None,
+                end_date=None
+            )
+
+        if not tarefas:
+            return jsonify({"mensagem": "Nenhuma tarefa encontrada para este funcionário no projeto."}), 404
+
+        if id_file != 'null':
+            completed = consultaSQL(
+                'SELECT', 'PROJECT', 
+                'id_file', id_file, 
+                completed=None
+            )
+            if completed and completed[0].get('completed', 0) == 0:
+                tarefas = calculate_delay(tarefas)
+        else:
+            tarefas = calculate_delay(tarefas)
+
+        # Organizar as tarefas por status
+        progresso: dict = get_progress(id_file, id_team, user_id=id_employee)
+        print(f"Tarefas encontradas para o funcionário '{id_employee}': {tarefas}")
+        print(f"Progresso das tarefas para o funcionário '{id_employee}': {progresso}")
+
+        return jsonify({
+            "tasks": tarefas,
+            "progress": progresso
+        }), 200
+
+    except Exception as error:
+        print(f"Erro ao buscar tarefas do funcionário: {error}")
+        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+
+

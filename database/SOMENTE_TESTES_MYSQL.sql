@@ -13,13 +13,14 @@ delete from `project` where id_file = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx
 alter table `sheet`
 modify column `responsible` varchar(120);
 
+alter table `project`
+add column `end_date` datetime;
 
 update `employee`
 set `password_hash` = '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36'
 where `user_id` = '806443c5-9271-464a-a1da-4581c7f766e4';
 
 select * from `address`;
-select * from `task_history`;
 select * from `project`;
 select * from `sheet`;
 select * from `employee`;
@@ -31,6 +32,10 @@ update `sheet` set `conclusion` = 1 where `id_file` = 'a5108b4f-e14c-4761-ac46-c
 
 UPDATE `sheet` SET `end_date` = NOW() WHERE (`end_date` IS NULL) AND (`conclusion` >= 1);
 
+update `sheet` set `resposible` = null where `num` = 526;
+
+update `project` set `completed` = false where `id_file` = '7e164ca8-cf6d-4a0b-885a-d7a41916f819.xlsx';
+
 select `completed`, `id_file`, `project_name` from `project` where `id_team` = 'b80bf62a-6ff5-498e-9b92-12c9d197122d';
 select COUNT(*) from `sheet` where `id_file` = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx';
 
@@ -40,17 +45,9 @@ SELECT `start_date`, `duration`, `conclusion` FROM `sheet` WHERE `id_file` = 'c1
 
 select `start_date` from `sheet`;
 
-update `sheet` set `start_date` = '2025-08-24 12:03:00' where `id_task` = 3283;
+update `sheet` set `start_date` = '2025-10-12 00:12:06' where `id_task` = 3734;
 
 select max(`num`) from `sheet`;
 
 insert into `EMPLOYEE` (`user_id`, `email`, `password_hash`, `name`, `last_name`, `role`, `id_team`)
 values ('b8460203-63b6-49ff-85e2-9e3be1ea20f9', 'usuario2@empresa.com.br', '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36', 'Beltrano', 'Fulano Sicrano da Silva', 'admin', 'b80bf62a-6ff5-498e-9b92-12c9d197122d');
-
-start transaction;
-
-update `sheet` set classe = 'Nada Nada' where num = '131';
-
-commit;
-
-UPDATE sheet SET start_date = CASE WHEN (start_date IS NULL OR start_date = '') AND (CASE WHEN COALESCE(conclusion,0) > 1 THEN COALESCE(conclusion,0)/100 ELSE COALESCE(conclusion,0) END ) > 0 THEN NOW() ELSE start_date END, end_date = CASE WHEN (end_date IS NULL OR end_date = '') AND ( CASE WHEN COALESCE(conclusion,0) > 1 THEN COALESCE(conclusion,0)/100 ELSE COALESCE(conclusion,0) END ) >= 1 THEN NOW() ELSE end_date END  WHERE id_file = :id_file
