@@ -1,6 +1,6 @@
-from .db import consultaSQL, ENGINE
 from string import Template
 from pathlib import Path
+from .db import ENGINE
 import pandas as pd
 
 diretorio = Path(__file__).parent

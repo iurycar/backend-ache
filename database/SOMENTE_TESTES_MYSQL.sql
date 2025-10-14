@@ -6,8 +6,8 @@ describe `teams`;
 
 delete from `employee` where user_id = 'b8460203-63b6-49ff-85e2-9e3be1ea20f9';
 delete from `teams` where id_team = '806443c5-9271-464a-a1da-4581c7f766e4';
-delete from `sheet` where id_file = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx';
-delete from `project` where id_file = 'c17545cd-5cf4-4573-82f1-a163ff5d3a50.xlsx';
+delete from `sheet` where id_file = '536b387f-9800-493c-8e32-4f7dfad4063e.xlsx';
+delete from `project` where id_file = '536b387f-9800-493c-8e32-4f7dfad4063e.xlsx';
 
 
 alter table `sheet`
@@ -26,13 +26,17 @@ select * from `sheet`;
 select * from `employee`;
 select * from `teams`;
 
+update `sheet` set `user_id` = null where `id_task` = 17;
+
+select max(num) from `sheet` where `id_file` = '536b387f-9800-493c-8e32-4f7dfad4063e.xlsx';
+
 select * from `sheet` where `id_file` = 'a5108b4f-e14c-4761-ac46-c2f2d43acc66.xlsx';
+
+select count(*) from `sheet` where ``
 
 update `sheet` set `conclusion` = 1 where `id_file` = 'a5108b4f-e14c-4761-ac46-c2f2d43acc66.xlsx';
 
 UPDATE `sheet` SET `end_date` = NOW() WHERE (`end_date` IS NULL) AND (`conclusion` >= 1);
-
-update `sheet` set `resposible` = null where `num` = 526;
 
 update `project` set `completed` = false where `id_file` = '7e164ca8-cf6d-4a0b-885a-d7a41916f819.xlsx';
 

@@ -106,7 +106,11 @@ def add_task(mensagem: str) -> str:
         # Se um documento for mencionado, consulta o banco de dados pelo nome do documento
         doc_name: str = documentos_match_ext[0].strip()
         doc_name: str = doc_name.replace(" ", "_") # Substitui espaços em brancos por underline
-        doc_metadata: dict = consultaSQL("SELECT", "PROJECT", "original_name", doc_name, id_file=None)
+        doc_metadata: dict = consultaSQL(
+            "SELECT", "PROJECT", 
+            where={"original_name": doc_name}, 
+            colunas_dados={"id_file": None}
+        )
 
         print(f"Documento mencionado: {doc_name.strip()} -> Metadado: {doc_metadata}")
 
@@ -118,7 +122,11 @@ def add_task(mensagem: str) -> str:
     elif projeto_match:
         # Se um projeto for mencionado, consulta o banco de dados pelo nome do projeto
         project_name: str = projeto_match.group(1).strip()
-        project_metadata: dict = consultaSQL("SELECT", "PROJECT", "project_name", project_name, id_file=None)
+        project_metadata: dict = consultaSQL(
+            "SELECT", "PROJECT", 
+            where={"project_name": project_name}, 
+            colunas_dados={"id_file": None}
+        )
 
         print(f"Projeto mencionado: {project_name} -> Metadado: {project_metadata}")
 
@@ -132,7 +140,11 @@ def add_task(mensagem: str) -> str:
 
         if re.search(r'\.(xlsx|csv)\b', valor_doc, re.IGNORECASE):
             doc_name: str = valor_doc.replace(" ", "_")
-            doc_metadata: dict = consultaSQL("SELECT", "PROJECT", "original_name", doc_name, id_file=None)
+            doc_metadata: dict = consultaSQL(
+                "SELECT", "PROJECT", 
+                where={"original_name": doc_name}, 
+                colunas_dados={"id_file": None}
+            )
 
             if doc_metadata:
                 dados['documentos'] = doc_name
@@ -140,7 +152,11 @@ def add_task(mensagem: str) -> str:
                 id_file = list(doc_metadata.keys())
         else:
             project_name: str = valor_doc
-            project_metadata: dict = consultaSQL("SELECT", "PROJECT", "project_name", project_name, id_file=None)
+            project_metadata: dict = consultaSQL(
+                "SELECT", "PROJECT", 
+                where={"project_name": project_name}, 
+                colunas_dados={"id_file": None}
+            )
 
             if project_metadata:
                 dados['documentos'] = project_name
@@ -171,25 +187,32 @@ def add_task(mensagem: str) -> str:
         #print(f"Dados extraídos: {dados}\n")
         if len(id_file) == 1:
             # Gera o próximo número da tarefa (num) automaticamente
-            old_num = consultaSQL("SELECT", "SHEET", "id_file", id_file[0], "MAX(num)")
+            old_num = consultaSQL(
+                "SELECT", "SHEET", 
+                where={"id_file": id_file[0]},
+                campo={'MAX': 'num'}
+            )
             base = 0
             if old_num and old_num[0].get('MAX(num)') is not None:
                 base = int(old_num[0]['MAX(num)'])
             num = base + 1
 
             # Insere a nova tarefa na tabela SHEET
-            consultaSQL("INSERT", "SHEET", 
-                id_file = id_file[0],
-                num = num,
-                classe = classificacao.replace(".", ""),
-                category = categoria.replace(".", "").strip().capitalize(),
-                phase = fase,
-                status = condicao.replace(".", "").strip().lower().capitalize(),
-                name = tarefa.capitalize(),
-                duration = duracao,
-                text = "Texto."+str(num),
-                reference = "Doc."+str(num),
-                conclusion = 0
+            consultaSQL(
+                "INSERT", "SHEET", 
+                colunas_dados={
+                    "id_file": id_file[0],
+                    "num": num,
+                    "classe": classificacao.replace(".", ""),
+                    "category": categoria.replace(".", "").strip().capitalize(),
+                    "phase": fase,
+                    "status": condicao.replace(".", "").strip().lower().capitalize(),
+                    "name": tarefa.capitalize(),
+                    "duration": duracao,
+                    "text": "Texto."+str(num),
+                    "reference": "Doc."+str(num),
+                    "conclusion": 0
+                }
             )
 
             print(f"Tarefa '{tarefa}' número '{num}' adicionada com sucesso! Detalhes:\n- Duração: {duracao}\n- Classificação: {classificacao.replace('.', '')}\n- Categoria: {categoria.replace('.', '').strip().capitalize()}\n- Fase: {fase}\n- Condição: {condicao.replace('.', '').strip().lower().capitalize()}\n- Documentos: {documentos}")
