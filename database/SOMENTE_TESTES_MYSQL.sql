@@ -9,12 +9,14 @@ delete from `teams` where id_team = '806443c5-9271-464a-a1da-4581c7f766e4';
 delete from `sheet` where id_file = '536b387f-9800-493c-8e32-4f7dfad4063e.xlsx';
 delete from `project` where id_file = '536b387f-9800-493c-8e32-4f7dfad4063e.xlsx';
 
-
 alter table `sheet`
 modify column `responsible` varchar(120);
 
 alter table `project`
 add column `end_date` datetime;
+
+ALTER TABLE `PROJECT` 
+CHANGE COLUMN `end_date` `closing_date` DATETIME;
 
 update `employee`
 set `password_hash` = '$2b$12$kBnnDa.GtQFCa.MC7RTr5OWxaqEs/FgCSJpQk4aLk1k6SmFODYJ36'

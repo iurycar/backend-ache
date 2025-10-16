@@ -95,8 +95,9 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                 # Monta WHERE com pares (coluna, valor)
                 for coluna, valor in where.items():
                     # Obtém a coluna e o valor (ex. id_file = '1')
-                    colunas_where.append(f"`{str(coluna)}` = %s")
-                    valores_where += (valor,)
+                    if valor != '':
+                        colunas_where.append(f"`{str(coluna)}` = %s")
+                        valores_where += (valor,)
 
                 # Se houver parâmetros especiais, adiciona ao WHERE
                 if where_especial:
@@ -118,11 +119,21 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                 # Cria a query SQL usando Template para evitar SQL Injection
                 if campo:
                     # Obtém a chave e o valor do campo especial
-                    # Exemplo: {'MAX': 'num'} ou {'COUNT': '*'}
+                    # Exemplo: {'MAX': 'num'} ou {'COUNT': '*'} ou {'JOIN ON': ['tabela2', 'coluna']}
                     chave, valor = list(campo.items())[0]
                     
-                    template_sql_query = Template("SELECT $campo($coluna) FROM `$tabela` WHERE $where_clause")
-                    sql_query = template_sql_query.safe_substitute(campo=chave, coluna=valor, tabela=tabela, where_clause=where_clause)
+                    if isinstance(valor, list):
+                        tabela_join, coluna_join = valor
+                        
+                        # SELECT col1, col2 FROM tabela JOIN tabela2 ON tabela.col = tabela2.col WHERE ...
+                        template_sql_query = Template("SELECT $colunas FROM `$tabela` JOIN `$tabela_join` ON `$tabela`.`$coluna_join` = `$tabela_join`.`$coluna_join` WHERE $where_clause")
+                        sql_query = template_sql_query.safe_substitute(colunas=colunas, tabela=tabela, tabela_join=tabela_join, coluna_join=coluna_join, where_clause=where_clause)
+                        params = tuple(valores_where)
+                        print(f"\nSQL Query: {sql_query} -> {params}")
+                    else:
+                        template_sql_query = Template("SELECT $campo($coluna) FROM `$tabela` WHERE $where_clause")
+                        sql_query = template_sql_query.safe_substitute(campo=chave, coluna=valor, tabela=tabela, where_clause=where_clause)
+    
                 else:
                     template_sql_query = Template("SELECT $colunas from `$tabela` WHERE $where_clause")
                     sql_query = template_sql_query.safe_substitute(colunas=colunas, tabela=tabela, where_clause=where_clause)
