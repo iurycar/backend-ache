@@ -62,7 +62,7 @@ create table `PROJECT` (
             `import_date`	datetime		not null,
             `project_name`  varchar(20)		not null,
             `completed`		boolean			default		0,
-            `end_date`		datetime,
+            `closing_date`	datetime,
             `id_team`		varchar(40)		not null,
             constraint project_id_pk primary key(`id_file`)
 );

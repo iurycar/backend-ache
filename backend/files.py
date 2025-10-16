@@ -298,25 +298,36 @@ def get_data_sheet(id_file):
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        data: list[dict] = consultaSQL(
-            'SELECT', 'SHEET', 
-            where={'id_file': id_file},
-            colunas_dados={
-                'num': None,
-                'classe': None,
-                'category': None,
-                'phase': None,
-                'status': None,
-                'name': None,
-                'duration': None,
-                'text': None,
-                'reference': None,
-                'conclusion': None,
-                'start_date': None,
-                'end_date': None,
-                'user_id': None,
-            },
-        )
+        colunas = {
+            'num': None,
+            'classe': None,
+            'category': None,
+            'phase': None,
+            'status': None,
+            'name': None,
+            'duration': None,
+            'text': None,
+            'reference': None,
+            'conclusion': None,
+            'start_date': None,
+            'end_date': None,
+            'user_id': None,
+        }
+
+        # Se o 'id_file' for 'null' ou 'all', busca todas as tarefas de todos os arquivos do time
+        if id_file is None or id_file.lower() == 'null' or id_file.strip() == 'all':
+            data: list[dict] = consultaSQL(
+                'SELECT', 'SHEET',
+                where={'id_team': id_team},
+                campo={'JOIN ON': ['PROJECT', 'id_file']},
+                colunas_dados=colunas
+            )
+        else:
+            data: list[dict] = consultaSQL(
+                'SELECT', 'SHEET', 
+                where={'id_file': id_file},
+                colunas_dados=colunas,
+            )
 
         if not data:
             return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
@@ -713,7 +724,7 @@ def set_project_completed(id_file: str):
         consultaSQL(
             'UPDATE', 'PROJECT',
             where={'id_file': id_file},
-            colunas_dados={'end_date': date}
+            colunas_dados={'closing_date': date}
         )
 
         print(f"Projeto {id_file} marcado como concluído.")
@@ -928,8 +939,8 @@ def get_employee_tasks(id_employee: str, id_file: str):
 
         # Organizar as tarefas por status
         progresso: dict = get_progress(id_file, id_team, user_id=id_employee)
-        print(f"Tarefas encontradas para o funcionário '{id_employee}': {tarefas}")
-        print(f"Progresso das tarefas para o funcionário '{id_employee}': {progresso}")
+        #print(f"Tarefas encontradas para o funcionário '{id_employee}': {tarefas}")
+        #print(f"Progresso das tarefas para o funcionário '{id_employee}': {progresso}")
 
         return jsonify({
             "tasks": tarefas,
