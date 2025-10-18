@@ -11,6 +11,14 @@ chatbot_bp = Blueprint('chatbot_bp', __name__)
 @chatbot_bp.route('/chat', methods=['POST'])
 def chat():
     try:
+        #user_id = session.get('user_id', None)
+        #id_team = session.get('id_team', None)
+
+        #print(f"Mensagem recebida de user_id: {user_id}")
+
+        #if not user_id or not id_team:
+        #    return jsonify({'resposta': 'Usuário não autenticado.'}), 401
+
         # Recebe a mensagem do JSON enviado pelo React
         dado = request.json
 

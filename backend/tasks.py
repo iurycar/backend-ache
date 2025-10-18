@@ -40,6 +40,8 @@ def calculate_delay(data: list[dict]) -> dict:
             row['atraso'] = 0
             continue
 
+        #print(f"Processando linha: {row}")
+
         dt_valor = row.get('start_date')
 
         if not dt_valor or dt_valor == '' or dt_valor is None:
@@ -47,7 +49,7 @@ def calculate_delay(data: list[dict]) -> dict:
             row['start_date'] = None
             continue
 
-        #print(f"Duração original para linha {row.get('num')}: {row.get('duration')}")
+        print(f"Duração original para linha {row.get('num')}: {row.get('duration')}")
 
         if isinstance(dt_valor, datetime.datetime):
             dt_inicio = dt_valor
@@ -68,13 +70,13 @@ def calculate_delay(data: list[dict]) -> dict:
         dt_fim = dt_inicio + datetime.timedelta(days=dias)
         dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
 
-        #print(f"Calculando atraso para linha {row.get('num')}:")
-        #print(f"  Data de início: {dt_inicio}")
-        #print(f"  Data atual: {dt_hoje}")
-        #print(f"  Duração (dias): {dias}")
-        #print(f"  Data de fim calculada: {prazo}")
+        print(f"Calculando atraso para linha {row.get('num')}:")
+        print(f"  Data de início: {dt_inicio}")
+        print(f"  Data atual: {dt_hoje}")
+        print(f"  Duração (dias): {dias}")
+        print(f"  Data de fim calculada: {prazo}")
 
-        #print(f"Atraso calculado para linha {row.get('num')}: {atraso} dias")
+        print(f"Atraso calculado para linha {row.get('num')}: {atraso} dias\n")
         
         row['atraso'] = atraso
         row['start_date'] = row['start_date'].isoformat()
@@ -162,8 +164,8 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
         overdue_count = 0
 
         for task in overdue:
-            #print(f"\nTarefa: {task}\n")
             if task.get('atraso', 0) > 0:
+                #print(f"\nTarefa: {task}\n")
                 overdue_count += 1
 
         in_progress_count = max(in_progress - overdue_count, 0)

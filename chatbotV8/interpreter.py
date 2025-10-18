@@ -1,11 +1,17 @@
-from .handle_demands import demands, advanced_chat
 from .learn import get_keywords, get_response_keywords
+from .handle_demands import demands, advanced_chat
+from .ahoCorasick import Automaton
+from collections import deque
 import random
 import re
 
 """
     Esse arquivo lida com a interpretação das mensagens do usuário e a construção da respostas
 """
+
+# Carrega os dados treinados
+CHAVES: dict[str, list[str]] = get_keywords() # Dicionário com as palavras chaves
+RESPOSTAS: dict[str, str | int] = get_response_keywords() # Dicionário com as respostas associadas as palavras chaves
 
 def get_intention(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str]:
     """ Função que interpreta a mensagem do usuário e decide a resposta apropriada.
@@ -26,17 +32,31 @@ def get_intention(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str
             resposta_gemini = advanced_chat(mensagem)
             return resposta_gemini, "avancado"  # Mantém avançado até o "sair"
 
-    chaves = get_keywords() # Dicionário com as palavras chaves
-    respostas = get_response_keywords() # Dicionário com as respostas associadas as palavras chaves
-    msg_chave = set()   # Cria um conjunto
+    msg_chave: deque[str] = deque()   # Cria um conjunto
 
-    for frase_chave, termo_associado in chaves.items():
-        key = frase_chave.lower().strip()
-        # Cria uma expressão regular para corresponder exatamente a palavra chave
-        pattern = rf'\b{re.escape(key)}\b' # Evita falsos positivos, ex. "oi" em "coisas"
+    #print(f"\nConteúdo: {CHAVES}")
 
-        if re.search(pattern, mensagem):
-            msg_chave.add(termo_associado)
+    # Utilizando o que a professora Patricia ensinou em aula, podemos criar uma trie para buscar as palavras chaves
+    # Tem o Algoritmo Aho-corasick que seria o ideal
+
+    for demanda, termos_associados in CHAVES.items():
+        #print(f"\nVerificando demanda: {demanda}")
+        #print(f"Termo associado: {termo_associado}")
+        key = demanda.lower().strip()
+        
+        # Termo associado é uma lista de palavras CHAVES
+        for palavra in termos_associados:
+            print(f"Verificando palavra chave: {palavra}")
+
+            if palavra in mensagem:
+                msg_chave.append(key)
+                print(f"Palavra chave '{palavra}' encontrada para demanda '{demanda}'")
+                break
+
+        if key in msg_chave:
+            continue
+
+    print(f"Palavras chaves encontradas na mensagem: {msg_chave}")
 
     # Se não encontrou nada
     if not msg_chave:
@@ -44,23 +64,31 @@ def get_intention(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str
 
     # Verifica se o usuário pediu para ativar o avançado
     if 'chat_avancado' in msg_chave:
-        resposta = build_response(mensagem, list(msg_chave), usuario, respostas)
+        resposta = build_response(mensagem, msg_chave, usuario)
         return resposta, 'avancado'  # ativa avançado para próximas interações
 
     # Resposta normal
-    resposta = build_response(mensagem, list(msg_chave), usuario, respostas)
+    resposta = build_response(mensagem, msg_chave, usuario)
     return resposta, 'standard'
 
 
-def build_response(mensagem: str, chaves: str, usuario: str, respostas: str) -> str:
+def build_response(mensagem: str, chaves: deque[str], usuario: str) -> str:
+    """ Constrói a resposta do chatbot com base nas palavras chaves encontradas na mensagem.
+    @param mensagem: Mensagem do usuário.
+    @param chaves: Lista de palavras chaves encontradas na mensagem.
+    @param usuario: Nome do usuário.
+    @return: Resposta do chatbot."""
+
     trechos_resposta: list[str] = [] # Armazena os trechos da resposta que foi construída
     prefixo: str = ' ' # Adicionado no começo das resposta da Liora
     
     # Passa por todos os termos chaves da mensagem, ex. ['cumprimentar', 'minhas_tarefas'...]
-    for chave in chaves:
-        if chave in respostas:
+    while len(chaves) > 0:
+        chave = chaves.popleft()
+        
+        if chave in RESPOSTAS:
             # Vai pegar a chave e buscar no dicionário que armazena as respostas com base na chave
-            processo = respostas[chave]
+            processo = RESPOSTAS[chave]
 
             # Verifica se a resposta para a mensagem é uma demanda/ação (int) ou um mensagem resposta (string)
             if isinstance(processo, int):
