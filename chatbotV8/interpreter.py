@@ -13,6 +13,11 @@ import re
 CHAVES: dict[str, list[str]] = get_keywords() # Dicionário com as palavras chaves
 RESPOSTAS: dict[str, str | int] = get_response_keywords() # Dicionário com as respostas associadas as palavras chaves
 
+TRIE = Automaton() # Cria o automato
+for demanda, termos in CHAVES.items(): # Palavras chaves para adicionar na trie
+    for termo in termos:
+        TRIE.add_string(termo, demanda)
+
 def get_intention(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str]:
     """ Função que interpreta a mensagem do usuário e decide a resposta apropriada.
     @param mensagem: Mensagem do usuário.
@@ -32,29 +37,10 @@ def get_intention(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str
             resposta_gemini = advanced_chat(mensagem)
             return resposta_gemini, "avancado"  # Mantém avançado até o "sair"
 
-    msg_chave: deque[str] = deque()   # Cria um conjunto
-
-    #print(f"\nConteúdo: {CHAVES}")
-
     # Utilizando o que a professora Patricia ensinou em aula, podemos criar uma trie para buscar as palavras chaves
     # Tem o Algoritmo Aho-corasick que seria o ideal
-
-    for demanda, termos_associados in CHAVES.items():
-        #print(f"\nVerificando demanda: {demanda}")
-        #print(f"Termo associado: {termo_associado}")
-        key = demanda.lower().strip()
-        
-        # Termo associado é uma lista de palavras CHAVES
-        for palavra in termos_associados:
-            print(f"Verificando palavra chave: {palavra}")
-
-            if palavra in mensagem:
-                msg_chave.append(key)
-                print(f"Palavra chave '{palavra}' encontrada para demanda '{demanda}'")
-                break
-
-        if key in msg_chave:
-            continue
+    encontrados = TRIE.find_values(mensagem)  # Encontra as palavras chaves na mensagem
+    msg_chave: deque[str] = deque(encontrados)   # Cria um conjunto
 
     print(f"Palavras chaves encontradas na mensagem: {msg_chave}")
 
@@ -66,6 +52,9 @@ def get_intention(mensagem: str, usuario: str, modo_chat: str) -> tuple[str, str
     if 'chat_avancado' in msg_chave:
         resposta = build_response(mensagem, msg_chave, usuario)
         return resposta, 'avancado'  # ativa avançado para próximas interações
+
+    if 'debug' in msg_chave:
+        print(f"DEBUG INFO:\nMensagem original: '{mensagem}'\nPalavras chaves: {list(msg_chave)}\nUsuário: '{usuario}'\nModo chat atual: '{modo_chat}'\nAutomato: {TRIE.show_trie()}\n")
 
     # Resposta normal
     resposta = build_response(mensagem, msg_chave, usuario)

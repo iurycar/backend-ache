@@ -1,4 +1,7 @@
 {
+    "debug": [
+        "debug"
+    ],
     "cumprimentar": [
         "olá",
         "oi",

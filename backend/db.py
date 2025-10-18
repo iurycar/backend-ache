@@ -101,7 +101,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
 
                 # Se houver parâmetros especiais, adiciona ao WHERE
                 if where_especial:
-                    # Exemplo: {'start_date': 'IS NULL', 'conclusion': '> 0', 'conclusion': '< 1'}
+                    # Exemplo: {'start_date': 'IS NULL', 'conclusion': ['> 0', '< 1']}
                     # Converte para 'start_date IS NULL AND conclusion > 0 AND conclusion < 1'
                     for coluna, valor in where_especial.items():
                         if isinstance(valor, list): 
