@@ -36,7 +36,7 @@ def get_response_keywords() -> dict[str, str | int]:
     else:
         print(f"Erro: O arquivo '{caminho_resposta}' não encontrado.")
 
-def training() -> None:
+def train_model() -> None:
     print(""""
                     #####################################################################
                     #                                                                   #
@@ -58,7 +58,8 @@ def training() -> None:
 
         visualizar = int(input("Você deseja visualizar os dados atuais? [1] Sim [2] Não: "))
 
-        if treinamento == 1: # Treinar perguntas
+        """ --------->>> TREINAR PERGUNTAS <<<--------- """
+        if treinamento == 1: 
             if visualizar == 1:
                 print("\n"+str(get_keywords())+"\n")
 
@@ -89,6 +90,7 @@ def training() -> None:
                     
                     print(f"A palavra chave '{palavra}' será associada a demanda '{demanda}'.\n")
 
+            """ --------->>> TREINAR RESPOSTAS <<<--------- """
         elif treinamento == 2: # Treinar respostas
             if visualizar == 1:
                 print("\n"+str(get_response_keywords()))
@@ -122,4 +124,4 @@ def training() -> None:
 
 
 if __name__ == '__main__':
-    training()
+    train_model()
