@@ -20,11 +20,24 @@ load_dotenv()
 # Inicializa o FLask
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_SECURE'] = True
+
+DEV_INSECURE = os.getenv('DEV_INSECURE_COOKIES', 'false').lower() == 'true'
+if DEV_INSECURE:
+    app.config['SESSION_COOKIE_SECURE'] = False
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+else:
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+    app.config['SESSION_COOKIE_SECURE'] = True
+    
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+
+frontend_ip = os.environ.get("BACKEND_LAN_IP")
+origins=['http://localhost:5173', 'http://127.0.0.1:5173']
+if frontend_ip:
+    origins.append(f'http://{frontend_ip}:5173')
+
 # Habilita o CORS com suporte a credenciais (cookies) para permitir requesições do REACT
-CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])   
+CORS(app, supports_credentials=True, origins=origins)
 
 # Registra o Blueprint
 app.register_blueprint(auth_bp, url_prefix='/')
@@ -40,4 +53,4 @@ if not os.path.exists(UPLOAD_FOLDER):           # Verifica se existe a pasta, se
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

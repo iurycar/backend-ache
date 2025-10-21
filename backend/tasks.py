@@ -2,37 +2,9 @@ from .db import consultaSQL
 import datetime
 import re
 
-def duration_to_days(duration) -> int:
-    """Converte uma duração em dias para valor numérico. Remove 'dias' da string."""
-    
-    # Retorna 0 se duration for None ou vazio
-    if not duration or duration is None:
-        return 0
-    
-    # Se for um número, assume que já está em dias
-    if isinstance(duration, (int, float)):
-        try:
-            return int(float(duration))
-        except Exception:
-            return 0
-    
-    texto = str(duration).strip()
+def calculate_delay(data: list[dict], total: bool = False) -> dict | int:
+    """ Calcula o atraso das tarefas individualmente ou o total de tarefas atrasadas """
 
-    # Usa regex para encontrar o primeiro número na string
-    match = re.search(r'(\d+(?:[.,]\d+)?)', texto)
-
-    if not match:
-        return 0
-
-    try:
-        return int(float(match.group(1).replace(',', '.')))
-    except Exception:
-        return 0
-
-
-def calculate_delay(data: list[dict]) -> dict:
-    # Calcula o atraso (em dias) para cada tarefa
-    # Não achei maneira mais eficiente de fazer isso :/
     for row in data:
         completed = row.get('conclusion', 0)
 
@@ -42,41 +14,55 @@ def calculate_delay(data: list[dict]) -> dict:
 
         #print(f"Processando linha: {row}")
 
-        dt_valor = row.get('start_date')
+        start_date = row.get('start_date')
 
-        if not dt_valor or dt_valor == '' or dt_valor is None:
+        if not start_date or start_date == '' or start_date is None:
             row['atraso'] = 0
             row['start_date'] = None
             continue
 
-        print(f"Duração original para linha {row.get('num')}: {row.get('duration')}")
+        deadline = row.get('deadline')
+        duration = row.get('duration')
 
-        if isinstance(dt_valor, datetime.datetime):
-            dt_inicio = dt_valor
-        elif isinstance(dt_valor, str) and dt_valor.strip():
+        print(f"Data de início para linha {row.get('num')}: {start_date}")
+        
+        if isinstance(start_date, datetime.datetime):
+            dt_inicio = start_date
+        elif isinstance(start_date, str):
             try:
-                dt_inicio = datetime.datetime.fromisoformat(dt_valor)
+                dt_inicio = datetime.datetime.fromisoformat(start_date)
             except Exception:
                 continue
         else:
             continue
 
-        dias: int = duration_to_days(row.get('duration'))
-        prazo = (dt_inicio + datetime.timedelta(days=dias)).date()
-        dt_hoje = datetime.datetime.now(dt_inicio.tzinfo).date()
+        print(f"Duração original para linha {row.get('num')}: {row.get('duration')} dias.")
 
-        atraso = max((dt_hoje - prazo).days, 0)
+        if isinstance(deadline, datetime.datetime):
+            dt_deadline = deadline
+        elif isinstance(deadline, str):
+            try:
+                dt_deadline = datetime.datetime.fromisoformat(deadline)
+            except Exception:
+                continue
+        else:
+            continue
 
-        dt_fim = dt_inicio + datetime.timedelta(days=dias)
-        dt_hoje = datetime.datetime.now(dt_inicio.tzinfo)
+        now = datetime.datetime.now(dt_inicio.tzinfo)
 
-        print(f"Calculando atraso para linha {row.get('num')}:")
-        print(f"  Data de início: {dt_inicio}")
-        print(f"  Data atual: {dt_hoje}")
-        print(f"  Duração (dias): {dias}")
-        print(f"  Data de fim calculada: {prazo}")
+        if now > dt_deadline:
+            atraso = (now - dt_deadline).days
+        else:
+            atraso = 0
 
-        print(f"Atraso calculado para linha {row.get('num')}: {atraso} dias\n")
+        #print(f"Calculando atraso para linha {row.get('num')}:")
+        #print(f"  Data atual: {now}")
+        #print(f"  Data de início: {start_date}")
+        #print(f"  Duração (dias): {duration}")
+        #print(f"  Data de fim calculada: {dt_deadline}")
+        #print(f"  Atraso encontrado: {atraso if atraso > 0 else 0} dias")
+
+        #print(f"Atraso calculado para linha {row.get('num')}: {atraso} dias\n")
         
         row['atraso'] = atraso
         row['start_date'] = row['start_date'].isoformat()
@@ -100,12 +86,13 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
         'overdue': 0
     }
 
+    # SELECT COUNT(*) FROM SHEET JOIN PROJECT ON SHEET.id_file = PROJECT.id_file WHERE id_team = ? AND SHEET.id_file = ? AND user_id = ?
     consulta = consultaSQL(
         'SELECT', 'SHEET', 
         where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id,},
         campo={'JOIN ON': ['PROJECT', 'id_file']},
         colunas_dados={
-            'COUNT(*)': None
+            'SQL:COUNT(*)': None
         }
     )
     
@@ -116,7 +103,7 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
         where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id, 'conclusion': 1},
         campo={'JOIN ON': ['PROJECT', 'id_file']},
         colunas_dados={
-            'COUNT(*)': None
+            'SQL:COUNT(*)': None
         }
     )
 
@@ -128,7 +115,7 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
         where_especial={'start_date': 'IS NULL', 'end_date': 'IS NULL'},
         campo={'JOIN ON': ['PROJECT', 'id_file']},
         colunas_dados={
-            'COUNT(*)': None
+            'SQL:COUNT(*)': None
         }
     )
 
@@ -140,8 +127,10 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
         where_especial={'conclusion': ['> 0', '< 1']},
         campo={'JOIN ON': ['PROJECT', 'id_file']},
         colunas_dados={
+            'id_task': None,
             'num': None,
             'start_date': None,
+            'deadline': None,
             'duration': None,
             'conclusion': None
         }
@@ -155,23 +144,27 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
 
     em_rows = rows_list(em_andamento)
 
-    if em_rows:
-        in_progress = len(em_rows)
+    in_progress = len(em_rows)
 
-        #print(f"Tarefas em andamento para o arquivo {id_file}: {in_progress}")
+    #print(f"Tarefas em andamento para o arquivo {id_file}: {in_progress}")
 
-        overdue = calculate_delay(em_rows)
-        overdue_count = 0
+    # select count(*) as `overdue` from `sheet` where `start_date` is not null and `deadline` is not null and datediff(NOW(), `deadline`) > 0;
+    overdue_tasks = consultaSQL(
+        'SELECT', 'SHEET',
+        where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id},
+        where_especial={'deadline': 'IS NOT NULL', 'start_date': 'IS NOT NULL', 'SQL:datediff(NOW(), `deadline`)': '> 0'},
+        campo={'JOIN ON': ['PROJECT', 'id_file']},
+        colunas_dados={
+            'SQL:COUNT(*)': None
+        }
+    )
 
-        for task in overdue:
-            if task.get('atraso', 0) > 0:
-                #print(f"\nTarefa: {task}\n")
-                overdue_count += 1
+    overdue_count = int(overdue_tasks[0].get('COUNT(*)', 0) or 0)
 
-        in_progress_count = max(in_progress - overdue_count, 0)
+    in_progress_count = max(in_progress - overdue_count, 0)
 
-        progresso['in_progress'] += in_progress_count
-        progresso['overdue'] += overdue_count
+    progresso['in_progress'] += in_progress_count
+    progresso['overdue'] += overdue_count
 
     return progresso
 
