@@ -65,7 +65,7 @@ def from_mysql_extrair(id_file:str) -> None:
         }
 
         # Consulta SQL para buscar os dados na tabela SHEET com base no id_file
-        template_sql_query = Template("SELECT `num`,`classe`,`category`,`phase`,`status`,`name`,`duration`,`text`,`reference`,`conclusion` FROM `sheet` WHERE `id_file` = '$id_file'")
+        template_sql_query = Template("SELECT `num`,`classe`,`category`,`phase`,`status`,`name`,CONCAT(`duration`, ' dias') AS `duration`, `text`,`reference`,`conclusion` FROM `sheet` WHERE `id_file` = '$id_file'")
         sql_query = template_sql_query.safe_substitute(id_file=id_file)
 
         print(f"Buscando dados na tabela SHEET para o arquivo '{id_file}'.")

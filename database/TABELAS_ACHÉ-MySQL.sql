@@ -87,6 +87,7 @@ create table `SHEET` (
             `reference`			varchar(12)		not null,
             `conclusion`		double			not null,
             `start_date` 		datetime,
+            `deadline`			datetime,
             `end_date` 			datetime,
             `id_file`			varchar(50)		not null,
             `user_id`			varchar(40),

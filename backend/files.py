@@ -157,7 +157,17 @@ def upload_file():
             where_especial={'end_date': 'IS NULL'}
         )
 
-        #UPDATE `sheet` SET `start_date` = date WHERE (`start_date` IS NULL) AND (`conclusion` > 0 AND `conclusion` < 1) AND `id_file` = id_file;
+        consultaSQL(
+            'UPDATE', 'SHEET',
+            where={},
+            colunas_dados={'duration': 'SQL:REPLACE(`duration`, " dias", "")'},
+        )
+
+        consultaSQL(
+            'UPDATE', 'SHEET',
+            where_especial={'start_date': 'IS NOT NULL', 'deadline': 'IS NULL', 'end_date': 'IS NULL'},
+            colunas_dados={'deadline': 'SQL:DATE_ADD(`start_date`, INTERVAL `duration` DAY)'}
+        )
     
         print(f"Arquivo {original_name} salvo com ID único {id_file} para o usuário {user_id}")
 
@@ -305,11 +315,12 @@ def get_data_sheet(id_file):
             'phase': None,
             'status': None,
             'name': None,
-            'duration': None,
+            'SQL:CONCAT(`duration`, " dias") AS `duration`': None,
             'text': None,
             'reference': None,
             'conclusion': None,
             'start_date': None,
+            'deadline': None,
             'end_date': None,
             'user_id': None,
         }
@@ -322,6 +333,29 @@ def get_data_sheet(id_file):
                 campo={'JOIN ON': ['PROJECT', 'id_file']},
                 colunas_dados=colunas
             )
+
+            if not data:
+                return jsonify({"mensagem": "Nenhuma informação de planilha encontrada para o time."}), 404
+
+            for task in data:
+                id_user = task.get('user_id')
+
+                if id_user not in (None, '', 'null'):
+                    user_info = consultaSQL(
+                        'SELECT', 'EMPLOYEE', 
+                        where={'user_id': id_user},
+                        colunas_dados={
+                            'first_name': None,
+                            'last_name': None,
+                        }
+                    )
+
+                    if user_info:
+                        task['responsible'] = f"{user_info[0].get('first_name', '')} {user_info[0].get('last_name', '')}".strip()
+
+                data = calculate_delay(data)
+                return jsonify({'dados': data}), 200
+
         else:
             data: list[dict] = consultaSQL(
                 'SELECT', 'SHEET', 
@@ -332,7 +366,10 @@ def get_data_sheet(id_file):
         if not data:
             return jsonify({"mensagem": "Informações da planilha não encontrada."}), 404
 
+        date = datetime.datetime.now().astimezone().date()
+
         for task in data:
+            # Adiciona o nome do responsável pela tarefa
             id_user = task.get('user_id')
             if id_user not in (None, '', 'null'):
                 user_info = consultaSQL(
@@ -359,7 +396,7 @@ def get_data_sheet(id_file):
         return jsonify({'dados': data}), 200
 
     except Exception as error:
-        print(f"Erro ao buscar todas as tarefas: {error}")
+        print(f"Erro ao buscar todas as tarefas: {error}"), 500
 
 
 # Rota para atualizar/adicionar uma linha da planilha
@@ -479,7 +516,7 @@ def update_add_row(id_file: str, num: int):
                     'phase': update_args.get('phase', ''),
                     'status': (update_args.get('status', '') or '').strip().lower().capitalize(),
                     'name': update_args.get('name', ''),
-                    'duration': update_args.get('duration', ''),
+                    'duration': update_args.get('duration', '').replace(' dias', ''),
                     'text': "Texto."+str(novo_num),
                     'reference': "Doc."+str(novo_num),
                     'conclusion': update_args.get('conclusion', 0),
@@ -568,7 +605,7 @@ def set_started_task(id_file: str, num: int):
         linha_existente = consultaSQL(
             'SELECT', 'SHEET', 
             where={'id_file': id_file, 'num': num},
-            colunas_dados={'id_file': None, 'num': None, 'start_date': None}
+            colunas_dados={'id_file': None, 'num': None, 'start_date': None, 'duration': None}
         )
 
         if not linha_existente:
@@ -578,13 +615,20 @@ def set_started_task(id_file: str, num: int):
         if start:
             return jsonify({"mensagem": "A tarefa já está em andamento."}), 400
 
-        date = datetime.datetime.now().astimezone().isoformat()
+        date = datetime.datetime.now()
 
         # Atualiza o status da tarefa para "EM ANDAMENTO"
         consultaSQL(
             'UPDATE', 'SHEET', 
             where={'id_file': id_file, 'num': num},
             colunas_dados={'start_date': date, 'user_id': user_id}
+        )
+
+        # Calcula e define o deadline (prazo) com base na duração
+        consultaSQL(
+            'UPDATE', 'SHEET',
+            where={'id_file': id_file, 'num': num},
+            colunas_dados={'deadline': 'SQL:DATE_ADD(`start_date`, INTERVAL `duration` DAY)'}
         )
 
         return jsonify({"mensagem": "Tarefa iniciada com sucesso."}), 200
@@ -803,9 +847,8 @@ def get_team_employees():
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
-# Rota para buscar dados dos funcionários do time
 @file_bp.route('/team/info', methods=['POST'])
-def get_data_team():
+def get_info_team():
     try:
         user_id = session.get('user_id')
         id_team = session.get('user_team')
@@ -817,42 +860,81 @@ def get_data_team():
             'SELECT', 'EMPLOYEE', 
             where={'id_team': id_team}, 
             colunas_dados={
+                'user_id': None,
                 'email': None,
                 'first_name': None,
                 'last_name': None,
                 'role': None,
                 'cellphone': None,
-                'active': None
+                'active': None,
+                'id_address': None
             }
         )
 
         if not consulta:
             return jsonify({"mensagem": "Nenhum funcionário encontrado para este time."}), 404
         
-        # Para cada funcionário, buscar o endereço
         for emp in consulta:
-            consulta_address: list[dict] = consultaSQL(
-                'SELECT', 'ADDRESS', 
-                where={'user_id': emp.get('user_id')}, 
+            address: list[dict] = consultaSQL(
+                'SELECT', 'ADDRESS',
+                where={'id_address': emp.get('id_address')},
                 colunas_dados={
-                    'city': None, 
-                    'state': None, 
+                    'street_address': None,
+                    'city': None,
+                    'state': None,
                     'country': None
                 }
             )
 
-            if consulta_address:
-                emp['address'] = consulta_address[0]
+            if address:
+                emp['address'] = {'street': address.get('street_address', ''),'city': address.get('city', ''), 'state': address.get('state', ''), 'country': address.get('country', '')}
             else:
-                emp['address'] = {}
-                emp['address']['city'] = None
-                emp['address']['state'] = None
-                emp['address']['country'] = None
+                emp['address'] = {'city': None, 'state': None, 'country': None}
+
+            # Contagem de tarefas concluídas por funcionário
+            consulta_tasks: list[dict] = consultaSQL(
+                'SELECT', 'SHEET',
+                where={'user_id': emp.get('user_id'), 'conclusion': 1},
+                colunas_dados={},
+                campo={'COUNT': '*'}
+            )
+
+            count_tasks = 0
+            
+            if isinstance(consulta_tasks, list) and consulta_tasks:
+                row = consulta_tasks[0]
+                count_tasks = int(row.get('COUNT(*)', 0) or 0)
+            emp['completed_tasks'] = count_tasks
+
+        # Projetos em andamento no time
+        projects: list[dict] = consultaSQL(
+            'SELECT', 'PROJECT',
+            where={'id_team': id_team, 'completed': 0},
+            colunas_dados={},
+            campo={'COUNT': '*'}
+        )
+
+        if isinstance(projects, list) and projects:
+            consulta[0]['ongoing_projects'] = int(projects[0].get('COUNT(*)', 0) or 0)
+        else:
+            consulta[0]['ongoing_projects'] = 0
+
+        # Nome da equipe
+        team_name: list[dict] = consultaSQL(
+            'SELECT', 'TEAMS',
+            where={'id_team': id_team},
+            colunas_dados={'name_team': None}
+        )
+
+        if isinstance(team_name, list) and team_name:
+            consulta[0]['team_name'] = team_name[0].get('name_team', '')
+
+        #print(f"Informações do time {id_team}: {consulta}")
 
         return jsonify({'employees': consulta}), 200
     except Exception as error:
         print(f"Erro ao buscar funcionários do time: {error}")
-        return jsonify({"mensagem": f"Ocorreu um erro."}), 500
+        return jsonify({"mensagem": "Ocorreu um erro."}), 500
 
 
 @file_bp.route('/team/progress', methods=['GET'])
@@ -904,6 +986,7 @@ def get_employee_tasks(id_employee: str, id_file: str):
                     'duration': None,
                     'conclusion': None,
                     'start_date': None,
+                    'deadline': None,
                     'end_date': None
                 }
             )
@@ -918,6 +1001,7 @@ def get_employee_tasks(id_employee: str, id_file: str):
                     'duration': None,
                     'conclusion': None,
                     'start_date': None,
+                    'deadline': None,
                     'end_date': None
                 }
             )

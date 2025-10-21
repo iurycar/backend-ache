@@ -30,6 +30,9 @@ auth_bp = Blueprint('auth_bp', __name__)
 @auth_bp.route("/login", methods=['POST'])
 def login():
     dados = request.json
+
+    print(f"Dados recebidos: {dados}")
+
     email: str = dados.get('email')
     password: str = dados.get('password')
 

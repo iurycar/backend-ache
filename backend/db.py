@@ -65,11 +65,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                 # (1, 'adasd', ...)
                 dados = tuple(colunas_dados.values())
 
-                colunas_list: list[str] = []
-                for chave in colunas_dados.keys():
-                    colunas_list.append(f"`{chave}`")
-
-                colunas = ", ".join(colunas_list)
+                colunas = normalize_column(colunas_dados)
                 placeholders = ", ".join(["%s"] * len(colunas_dados))  
                 #print(f"Placeholders: {placeholders}")
                 #print(f"Valores inseridos: {dados}")
@@ -87,34 +83,11 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
             case "SELECT":
                 colunas_where: list[str] = []
                 valores_where: tuple[object] = ()
-                colunas: str = '*'
+                where_clause: str
+                params: tuple[Any]
 
-                if colunas_dados not in [None, {}]:
-                    colunas = ", ".join(colunas_dados.keys()) 
-
-                # Monta WHERE com pares (coluna, valor)
-                for coluna, valor in where.items():
-                    # Obtém a coluna e o valor (ex. id_file = '1')
-                    if valor != '':
-                        colunas_where.append(f"`{str(coluna)}` = %s")
-                        valores_where += (valor,)
-
-                # Se houver parâmetros especiais, adiciona ao WHERE
-                if where_especial:
-                    # Exemplo: {'start_date': 'IS NULL', 'conclusion': ['> 0', '< 1']}
-                    # Converte para 'start_date IS NULL AND conclusion > 0 AND conclusion < 1'
-                    for coluna, valor in where_especial.items():
-                        if isinstance(valor, list): 
-                            # Se for uma lista, adiciona cada condição
-                            # Exemplo: {'conclusion': ['> 0', '< 1']}
-                            # Converte para 'conclusion > 0 AND conclusion < 1'
-                            for v in valor:
-                                colunas_where.append(f"`{str(coluna)}` {v}")
-                        else:
-                            colunas_where.append(f"`{str(coluna)}` {valor}")
-
-                # Monta a cláusula WHERE (ex. `id_file` = %s AND `name` = %s)
-                where_clause = " AND ".join(colunas_where) if colunas_where else '1=1'
+                colunas: str = normalize_column(colunas_dados)
+                where_clause, params = normalize_where(where, where_especial)
 
                 # Cria a query SQL usando Template para evitar SQL Injection
                 if campo:
@@ -128,8 +101,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                         # SELECT col1, col2 FROM tabela JOIN tabela2 ON tabela.col = tabela2.col WHERE ...
                         template_sql_query = Template("SELECT $colunas FROM `$tabela` JOIN `$tabela_join` ON `$tabela`.`$coluna_join` = `$tabela_join`.`$coluna_join` WHERE $where_clause")
                         sql_query = template_sql_query.safe_substitute(colunas=colunas, tabela=tabela, tabela_join=tabela_join, coluna_join=coluna_join, where_clause=where_clause)
-                        params = tuple(valores_where)
-                        print(f"\nSQL Query: {sql_query} -> {params}")
+                        #print(f"\nSQL Query: {sql_query} -> {params}")
                     else:
                         template_sql_query = Template("SELECT $campo($coluna) FROM `$tabela` WHERE $where_clause")
                         sql_query = template_sql_query.safe_substitute(campo=chave, coluna=valor, tabela=tabela, where_clause=where_clause)
@@ -138,8 +110,6 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                     template_sql_query = Template("SELECT $colunas from `$tabela` WHERE $where_clause")
                     sql_query = template_sql_query.safe_substitute(colunas=colunas, tabela=tabela, where_clause=where_clause)
 
-                # Monta os parâmetros da consulta
-                params = tuple(valores_where)
                 #print(f"\nSQL Query: {sql_query} -> {params}")
 
                 cursor.execute(sql_query, params)
@@ -183,6 +153,11 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                     if consulta:
                         return consulta
 
+                elif tabela == "ADDRESS":
+                    consulta = cursor.fetchone()
+                    if consulta:
+                        return consulta
+
                 #resultados = cursor.fetchall() # Pega todos os resultados da consulta
                 return resultados
 
@@ -190,33 +165,22 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                 if not colunas_dados:
                     raise ValueError("Nenhuma coluna para atualizar foi informada.")
 
-                colunas_where: list[str] = []         # Partes do WHERE
-                valores_where: list[object] = []    # Valores para o WHERE
                 colunas_set: list[str] = []         # Partes do SET
                 valores_set: tuple[str] = ()        # Valores para o SET
-
-                # -> WHERE `coluna` = %s AND `coluna2` = %s ...
-                # Monta WHERE com pares (coluna, valor)
-                for coluna, valor in where.items():
-                    colunas_where.append(f"`{coluna}` = %s")
-                    valores_where.append(valor)
-
-                # Se houver parâmetros especiais, adiciona ao WHERE
-                if where_especial:
-                    for coluna, valor in where_especial.items():
-                        if isinstance(valor, list):
-                            for v in valor:
-                                colunas_where.append(f"`{str(coluna)}` {v}")
-                        else:
-                            colunas_where.append(f"`{str(coluna)}` {valor}")
+                where_clause: str
+                params: tuple[Any]
                             
-                where_clause: str = " AND ".join(colunas_where)
+                where_clause, params = normalize_where(where, where_especial)
 
                 # -> SET `coluna` = %s, `coluna2` = %s ...
                 # Monta SET com pares (coluna, valor)
                 for coluna, valor in colunas_dados.items():
-                    colunas_set.append(f"`{coluna}` = %s")
-                    valores_set += (valor,)
+                    if isinstance(valor, str) and valor.startswith('SQL:'):
+                        expressao = valor[4:]  # Remove o prefixo 'SQL:'
+                        colunas_set.append(f"`{coluna}` = {expressao}")
+                    else:
+                        colunas_set.append(f"`{coluna}` = %s")
+                        valores_set += (valor,)
 
                 colunas_set_str: str = ", ".join(colunas_set)
 
@@ -224,7 +188,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                 sql_query = template_sql_query.safe_substitute(tabela=tabela, set_colunas=colunas_set_str, where_clause=where_clause)
 
                 # Valores: primeiro os do SET, depois os do WHERE
-                params = valores_set + tuple(valores_where)
+                params = valores_set + params
                 print(f"\nSQL Query: {sql_query} -> {params}\n")
                 cursor.execute(sql_query, params)
                 connection.commit()
@@ -235,16 +199,13 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                 # Monta WHERE com pares (coluna, valor)
                 colunas_where: list[str] = []
                 valores_where: list[object] = []
+                where_clause: str
+                params: tuple[Any]
 
-                for coluna, valor in where.items():
-                    colunas_where.append(f"`{coluna}` = %s")
-                    valores_where.append(valor)
-
-                where_clause = " AND ".join(colunas_where)
+                where_clause, params = normalize_where(where, where_especial)
 
                 template_sql_query = Template("DELETE FROM `$tabela` WHERE $where_clause")
                 sql_query = template_sql_query.safe_substitute(tabela=tabela, where_clause=where_clause)
-                params = tuple(valores_where)
                 
                 print(f"SQL Query: {sql_query} -> {params}")
 
@@ -266,6 +227,57 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
         if connection:
             connection.close()
         #print(f"Conexão encerrada.")
+
+
+def normalize_where(where: dict[str, Any], where_especial: dict[str, Any]) -> tuple[str, tuple[Any]]:
+    colunas_where: list[str] = []       # Partes do WHERE
+    valores_where: tuple[str] = ()      # Valores para o WHERE
+
+    # Monta WHERE com pares (coluna, valor)
+    # Obtém a coluna e o valor (ex. id_file = '1')
+    if where:
+        for coluna, valor in where.items():
+            if valor != '':
+                if isinstance(valor, str) and valor.startswith('SQL:'):
+                    expressao = valor[4:]  # Remove o prefixo 'SQL:'
+                    colunas_where.append(f"`{coluna}` = {expressao}")
+                else:
+                    colunas_where.append(f"`{str(coluna)}` = %s")
+                    valores_where += (valor,)
+
+    # Se houver parâmetros especiais, adiciona ao WHERE
+    # Exemplo: {'start_date': 'IS NULL', 'conclusion': ['> 0', '< 1']}
+    # Converte para 'start_date IS NULL AND conclusion > 0 AND conclusion < 1'
+    if where_especial:
+        for coluna, valor in where_especial.items():
+            if isinstance(valor, list): 
+                for v in valor:
+                    colunas_where.append(f"`{str(coluna)}` {v}")
+            else:
+                if coluna.startswith('SQL:'):
+                    expressao = coluna[4:]  # Remove o prefixo 'SQL:'
+                    colunas_where.append(f"{expressao} {valor}")
+                else:
+                    colunas_where.append(f"`{str(coluna)}` {valor}")
+
+    where_clause: str = " AND ".join(colunas_where) if colunas_where else '1=1'
+
+    return where_clause, valores_where
+
+
+def normalize_column(colunas_dados: dict[str, Any]) -> str:
+    colunas_list: list[str] = []
+
+    for chave in colunas_dados.keys():
+        if chave.startswith('SQL:'):
+            expressao = chave[4:]  # Remove o prefixo 'SQL:'
+            colunas_list.append(f"{expressao}")
+        else:
+            colunas_list.append(f"`{chave}`")
+    
+    colunas = ", ".join(colunas_list)
+
+    return colunas
 
 
 if __name__ == "__main__":
