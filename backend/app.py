@@ -22,14 +22,17 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 
 DEV_INSECURE = os.getenv('DEV_INSECURE_COOKIES', 'false').lower() == 'true'
+
 if DEV_INSECURE:
+    # Dev local (http) mesma máquina/host
     app.config['SESSION_COOKIE_SECURE'] = False
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 else:
+    # Produção (https)
     app.config['SESSION_COOKIE_SAMESITE'] = 'None'
     app.config['SESSION_COOKIE_SECURE'] = True
     
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=20)
 
 frontend_ip = os.environ.get("BACKEND_LAN_IP")
 origins=['http://localhost:5173', 'http://127.0.0.1:5173']

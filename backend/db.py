@@ -9,7 +9,7 @@ import os
 
 """
     Esse arquivo lidará com as requisições do frontend e backend para o banco de dados
-    Deverá conectar ao banco de dados e fazer consultas, como por exemplo SELECT * FROM employee
+    Deverá conectar ao banco de dados e fazer consultas, como por exemplo SELECT * FROM EMPLOYEES
 """
 
 load_dotenv()
@@ -114,7 +114,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
 
                 cursor.execute(sql_query, params)
 
-                if tabela == "EMPLOYEE":
+                if tabela == "EMPLOYEES":
                     if (where.get('email') is not None) and (len(where) == 2):
                         consulta = cursor.fetchone() # Pega o primeiro resultado da consulta
                         email: str = where[1]
@@ -129,7 +129,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                     if consulta_resultados:
                         return consulta_resultados
 
-                elif tabela == "PROJECT":
+                elif tabela == "PROJECTS":
                     consulta_resultados = cursor.fetchall() # Pega todos os resultados da consulta
                     #print(consulta_resultados)
 
@@ -143,7 +143,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                         else:
                             return consulta_resultados
 
-                elif tabela == "SHEET":
+                elif tabela == "SHEETS":
                     consulta_resultados = cursor.fetchall()
                     return consulta_resultados
                 #print(f"Resultado: {resultados}")
@@ -283,7 +283,7 @@ def normalize_column(colunas_dados: dict[str, Any]) -> str:
 if __name__ == "__main__":
     consultaSQL()
 
-    """consultaSQL("INSERT", "EMPLOYEE", 
+    """consultaSQL("INSERT", "EMPLOYEES", 
     user_id =       '806443c5-9271-464a-a1da-4581c7f766e4', 
     email =         'usuario@empresa.com.br',
     password_hash = '123456',
@@ -293,7 +293,7 @@ if __name__ == "__main__":
     
     print("")
 
-    auth_data = consultaSQL("SELECT", "EMPLOYEE", 
+    auth_data = consultaSQL("SELECT", "EMPLOYEES", 
     'email', 'usuario@empresa.com.br', 
     user_id=None, 
     password_hash=None,
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     last_name=None,
     role=None)
     
-    print(f"\nResultado da consulta EMPLOYEE: {auth_data}\n")
+    print(f"\nResultado da consulta EMPLOYEES: {auth_data}\n")
 
     consultaSQL("DELETE", "METADATA", '1', '1')
 
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     print(f"\nResultado da consulta METADATA: {metadata_data}\n")
 
     id_file = 'bd01523e-d4fd-47f8-9a07-cae35366b15f.xlsx'
-    sheet_data = consultaSQL('SELECT', 'SHEET', 'METADATA_id_file', id_file,
+    sheet_data = consultaSQL('SELECT', 'SHEETS', 'METADATA_id_file', id_file,
     num=None,
     classe=None,
     category=None,

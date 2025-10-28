@@ -177,5 +177,10 @@
         "usuarios",
         "membros",
         "membro"
+    ],
+    "como_fazer": [
+        "como faço a tarefa",
+        "como fazer a tarefa",
+        "como realizar a tarefa"
     ]
 }

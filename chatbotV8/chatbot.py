@@ -11,13 +11,13 @@ chatbot_bp = Blueprint('chatbot_bp', __name__)
 @chatbot_bp.route('/chat', methods=['POST'])
 def chat():
     try:
-        #user_id = session.get('user_id', None)
-        #id_team = session.get('id_team', None)
+        user_id = session.get('user_id', None)
+        id_team = session.get('id_team', None)
 
-        #print(f"Mensagem recebida de user_id: {user_id}")
+        print(f"Mensagem recebida de user_id: {user_id}")
 
-        #if not user_id or not id_team:
-        #    return jsonify({'resposta': 'Usuário não autenticado.'}), 401
+        if not user_id:
+            return jsonify({'resposta': 'Por favor, faça login para continuar.'})
 
         # Recebe a mensagem do JSON enviado pelo React
         dado = request.json
@@ -26,7 +26,6 @@ def chat():
             return jsonify({'resposta': 'Por favor, forneça uma mensagem na requisição'})
 
         mensagem = dado.get('mensagem', '')
-        usuario = session.get('user_name', 'Convidado')
         modo_chat = session.get('modo_chat', 'standard')
 
         #print(f"--- ANTES DE INTERPRETAR ---")
@@ -34,7 +33,7 @@ def chat():
         #print(f"Modo da sessão ATUAL: '{modo_chat}'")
 
         # Envia a mensagem e o modo do chat para o interpretador
-        resposta_chatbot, proximo_modo_chat = get_intention(mensagem, usuario, modo_chat)
+        resposta_chatbot, proximo_modo_chat = get_intention(mensagem, user_id, modo_chat)
 
         #print(f"--- DEPOIS DE INTERPRETAR ---")
         #print(f"Resposta gerada: '{resposta_chatbot}'")
