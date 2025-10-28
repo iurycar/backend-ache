@@ -58,8 +58,8 @@ def train_model() -> None:
 
         visualizar = int(input("Você deseja visualizar os dados atuais? [1] Sim [2] Não: "))
 
-        """ --------->>> TREINAR PERGUNTAS <<<--------- """
         if treinamento == 1: 
+            """ --------->>> TREINAR PERGUNTAS <<<--------- """
             if visualizar == 1:
                 print("\n"+str(get_keywords())+"\n")
 
@@ -90,12 +90,13 @@ def train_model() -> None:
                     
                     print(f"A palavra chave '{palavra}' será associada a demanda '{demanda}'.\n")
 
-            """ --------->>> TREINAR RESPOSTAS <<<--------- """
         elif treinamento == 2: # Treinar respostas
+            """ --------->>> TREINAR RESPOSTAS <<<--------- """
+
             if visualizar == 1:
                 print("\n"+str(get_response_keywords()))
 
-            demanda = str(input("\nInforme qual a demanda que deseja responder (ex. 'cumprimentar' ou '1' para ações): "))
+            demanda = str(input("\nInforme qual a demanda que deseja responder (ex. 'cumprimentar'): "))
             print(f"\nPara a demanda '{demanda}' a resposta pode ser uma frase (ex. 'Olá, como posso ajudar?') ou um dígito/int (ex. '1' para ações).")
             responder = str(input("Informe a resposta (ou '0' para sair): "))
             print(f"A resposta para a demanda '{demanda}' será '{responder}'.")

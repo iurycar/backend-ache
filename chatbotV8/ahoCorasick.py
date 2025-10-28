@@ -1,3 +1,4 @@
+import unicodedata
 import re
 
 """ 
@@ -117,7 +118,8 @@ class Automaton:
 
     def normalize(self, string: str) -> str:
         """ Normaliza a string para conter apenas caracteres minúsculos a-z """
-        return re.sub(r'[^a-z]', '', string.lower())
+        string = ''.join(c for c in unicodedata.normalize('NFD', string.lower()) if unicodedata.category(c) != 'Mn')
+        return re.sub(r'[^a-z]', '', string)
 
     def node_for(self, string: str) -> int | None:
         """ Retorna o índice do Nó alcançado após processar a string.

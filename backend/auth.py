@@ -9,7 +9,7 @@ from pathlib import Path
 
 def consulta_db(email: str) -> dict | None:
     resultado = consultaSQL(
-        "SELECT", "EMPLOYEE", 
+        "SELECT", "EMPLOYEES", 
         where={'email': email},
         colunas_dados={
             'user_id': None,

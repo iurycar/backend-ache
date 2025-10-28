@@ -21,7 +21,7 @@ diretorio = Path(__file__).parent
 def load_metadata(id_team: str) -> "Dados do projeto":
     """ Carrega os metadados do arquivo do banco de dados. """
     resultados = consultaSQL(
-        'SELECT', 'PROJECT',
+        'SELECT', 'PROJECTS',
         where={'id_team': id_team},
         colunas_dados={
             'id_file': None,
@@ -36,7 +36,7 @@ def load_metadata(id_team: str) -> "Dados do projeto":
 def save_metadata(id_file: str, filename: str, timestamp: str, id_team: str, project_name: str) -> None:
     """ Salva os metadados do arquivo no banco de dados. """
     consultaSQL(
-        'INSERT', 'PROJECT',
+        'INSERT', 'PROJECTS',
         colunas_dados={
             'id_file': id_file,
             'original_name': filename,
@@ -80,7 +80,7 @@ def upload_file():
         original_name: str = secure_filename(arquivo.filename)
 
         consulta = consultaSQL(
-            'SELECT', 'PROJECT', 
+            'SELECT', 'PROJECTS', 
             where={'original_name': original_name, 'id_team': id_team},
             colunas_dados={'id_file': None}
         )
@@ -106,20 +106,31 @@ def upload_file():
         date = datetime.datetime.now().astimezone().isoformat()
 
         # Exemplo nome do projeto 'Projeto 1' em "Desafio Número 1_Projeto 1 - Exportado.xlsx"
-        project_name_pattern = r'Projeto\s+([^-_]+)'  # Padrão regex para capturar o nome do projeto
-        match = re.search(project_name_pattern, arquivo.filename) # Procura o padrão no nome do arquivo
-        parte_name_pattern = r'Parte\s+([^-_]+)'
-        match2 = re.search(parte_name_pattern, arquivo.filename)
+        patterns = [r'Projeto\s+([^-_]+)', r'Parte\s+([^-_]+)'] # Padrão regex para capturar o nome do projeto
 
-        if match:
-            project_name = match.group(1).strip()
-        elif match2:
-            project_name = match2.group(1).strip()
-        elif not match and not match2:
-            project_name = "Sem Nome"
+        for i in range(len(patterns)):
+            match = re.search(patterns[i], arquivo.filename) # Procura o padrão no nome do arquivo
+
+            if match:
+                project_name = match.group(1).strip()
+                break
+
+        if not match:
+            # Se não encontrar nenhum padrão, define um nome genérico
+            names = consultaSQL(
+                'SELECT', 'PROJECTS', 
+                where={'id_team': id_team}, 
+                colunas_dados={'project_name': None}
+            )
+            
+            # Se não encontrar um nome para o projeto no nome do arquivo, cria um nome genérico baseado na quantidade de projetos do time
+            if names:
+                project_name = f"{len(names)+1}"
+            else:
+                project_name = "1"
 
         consulta = consultaSQL(
-            'SELECT', 'PROJECT', 
+            'SELECT', 'PROJECTS', 
             where={'project_name': project_name, 'id_team': id_team},
             colunas_dados={'id_file': None}
         )
@@ -132,7 +143,7 @@ def upload_file():
         save_metadata(id_file, original_name, date, id_team, project_name)
 
         # Verifica se o id_file foi salvo corretamente no banco de dados
-        project_metadata = consultaSQL('SELECT', 'PROJECT', where={'id_file': id_file}, colunas_dados={'id_file': None})
+        project_metadata = consultaSQL('SELECT', 'PROJECTS', where={'id_file': id_file}, colunas_dados={'id_file': None})
         if not project_metadata:
             print(f"Erro: Metadados do arquivo {id_file} não foram salvos no banco de dados.")
             return jsonify({'mensagem': 'Erro ao salvar os metadados do arquivo.'}), 500
@@ -142,31 +153,38 @@ def upload_file():
 
         date = datetime.datetime.now().astimezone().isoformat()
 
+        consultaSQL(
+            'UPDATE', 'SHEETS',
+            where={},
+            colunas_dados={'duration': 'SQL:REPLACE(`duration`, " dias", "")'},
+        )
+
         # Atualiza start_date e end_date em lote (normalizando conclusion 0–1 ou 0–100)
         consultaSQL(
-            'UPDATE', 'SHEET', 
+            'UPDATE', 'SHEETS', 
             where={'id_file': id_file},
             colunas_dados={'start_date': date},
             where_especial={'start_date': 'IS NULL', 'conclusion': ['> 0', '< 1']}
         )
 
         consultaSQL(
-            'UPDATE', 'SHEET', 
+            'UPDATE', 'SHEETS', 
             where={'id_file': id_file, 'conclusion': 1}, 
             colunas_dados={'end_date': date},
             where_especial={'end_date': 'IS NULL'}
         )
 
         consultaSQL(
-            'UPDATE', 'SHEET',
-            where={},
-            colunas_dados={'duration': 'SQL:REPLACE(`duration`, " dias", "")'},
-        )
-
-        consultaSQL(
-            'UPDATE', 'SHEET',
+            'UPDATE', 'SHEETS',
             where_especial={'start_date': 'IS NOT NULL', 'deadline': 'IS NULL', 'end_date': 'IS NULL'},
             colunas_dados={'deadline': 'SQL:DATE_ADD(`start_date`, INTERVAL `duration` DAY)'}
+        )
+
+        # Garantir que seja substitua todas as ocorrências de " dias" na coluna duration
+        consultaSQL(
+            'UPDATE', 'SHEETS',
+            where={},
+            colunas_dados={'duration': 'SQL:REPLACE(`duration`, " dias", "")'},
         )
     
         print(f"Arquivo {original_name} salvo com ID único {id_file} para o usuário {user_id}")
@@ -248,8 +266,8 @@ def delete_file(id_file: str):
         if os.path.exists(arquivo_caminho):
             os.remove(arquivo_caminho)  # Deleta o arquivo do diretório
 
-            consultaSQL('DELETE', 'SHEET', where={'id_file': id_file}) # Deleta todas as linhas com a mesma FK
-            consultaSQL('DELETE', 'PROJECT', where={'id_file': id_file})  # Deleta os metadados do arquivo
+            consultaSQL('DELETE', 'SHEETS', where={'id_file': id_file}) # Deleta todas as linhas com a mesma FK
+            consultaSQL('DELETE', 'PROJECTS', where={'id_file': id_file})  # Deleta os metadados do arquivo
 
             print(f"Arquivo {id_file} excluído com sucesso.")
 
@@ -328,9 +346,9 @@ def get_data_sheet(id_file):
         # Se o 'id_file' for 'null' ou 'all', busca todas as tarefas de todos os arquivos do time
         if id_file is None or id_file.lower() == 'null' or id_file.strip() == 'all':
             data: list[dict] = consultaSQL(
-                'SELECT', 'SHEET',
+                'SELECT', 'SHEETS',
                 where={'id_team': id_team},
-                campo={'JOIN ON': ['PROJECT', 'id_file']},
+                campo={'JOIN ON': ['PROJECTS', 'id_file']},
                 colunas_dados=colunas
             )
 
@@ -342,7 +360,7 @@ def get_data_sheet(id_file):
 
                 if id_user not in (None, '', 'null'):
                     user_info = consultaSQL(
-                        'SELECT', 'EMPLOYEE', 
+                        'SELECT', 'EMPLOYEES', 
                         where={'user_id': id_user},
                         colunas_dados={
                             'first_name': None,
@@ -358,7 +376,7 @@ def get_data_sheet(id_file):
 
         else:
             data: list[dict] = consultaSQL(
-                'SELECT', 'SHEET', 
+                'SELECT', 'SHEETS', 
                 where={'id_file': id_file},
                 colunas_dados=colunas,
             )
@@ -373,7 +391,7 @@ def get_data_sheet(id_file):
             id_user = task.get('user_id')
             if id_user not in (None, '', 'null'):
                 user_info = consultaSQL(
-                    'SELECT', 'EMPLOYEE', 
+                    'SELECT', 'EMPLOYEES', 
                     where={'user_id': id_user},
                     colunas_dados={
                         'first_name': None,
@@ -385,7 +403,7 @@ def get_data_sheet(id_file):
                     task['responsible'] = f"{user_info[0].get('first_name', '')} {user_info[0].get('last_name', '')}".strip()
 
         completed: list[dict] = consultaSQL(
-            'SELECT', 'PROJECT', 
+            'SELECT', 'PROJECTS', 
             where={'id_file': id_file},
             colunas_dados={'completed': None}
         )
@@ -474,7 +492,7 @@ def update_add_row(id_file: str, num: int):
         
         # Verifica se a linha existe
         linha_existente = consultaSQL(
-            'SELECT', 'SHEET', 
+            'SELECT', 'SHEETS', 
             where={'id_file': id_file, 'num': num},
             colunas_dados={'id_file': None, 'num': None}
         )
@@ -486,7 +504,7 @@ def update_add_row(id_file: str, num: int):
             # calcular próximo número de linha para este arquivo
             try:
                 max_result = consultaSQL(
-                    'SELECT', 'SHEET', 
+                    'SELECT', 'SHEETS', 
                     where={'id_file': id_file}, 
                     colunas_dados={},
                     campo={'MAX': 'num'}
@@ -507,7 +525,7 @@ def update_add_row(id_file: str, num: int):
             print(f"\nInserindo nova linha {novo_num} no arquivo {id_file} com: {update_args}\n")
 
             consultaSQL(
-                'INSERT', 'SHEET',
+                'INSERT', 'SHEETS',
                 colunas_dados= {
                     'id_file': id_file,
                     'num': novo_num,
@@ -533,7 +551,7 @@ def update_add_row(id_file: str, num: int):
 
             # Executa o UPDATE na linha alvo (chave: id_file + num atual)
             consultaSQL(
-                'UPDATE', 'SHEET', 
+                'UPDATE', 'SHEETS', 
                 where={'id_file': id_file, 'num': num},
                 colunas_dados=update_args
             )
@@ -565,7 +583,7 @@ def delete_row(id_file: str, num: int):
 
         # Verifica se a linha existe
         linha_existente = consultaSQL(
-            'SELECT', 'SHEET', 
+            'SELECT', 'SHEETS', 
             where={'id_file': id_file, 'num': num},
             colunas_dados={'id_file': None, 'num': None}
         )
@@ -575,7 +593,7 @@ def delete_row(id_file: str, num: int):
 
         # Executa o DELETE na linha alvo (chave: id_file + num atual)
         consultaSQL(
-            'DELETE', 'SHEET', 
+            'DELETE', 'SHEETS', 
             where={'id_file': id_file, 'num': num}
         )
 
@@ -603,7 +621,7 @@ def set_started_task(id_file: str, num: int):
 
         # Verifica se a linha existe
         linha_existente = consultaSQL(
-            'SELECT', 'SHEET', 
+            'SELECT', 'SHEETS', 
             where={'id_file': id_file, 'num': num},
             colunas_dados={'id_file': None, 'num': None, 'start_date': None, 'duration': None}
         )
@@ -619,14 +637,14 @@ def set_started_task(id_file: str, num: int):
 
         # Atualiza o status da tarefa para "EM ANDAMENTO"
         consultaSQL(
-            'UPDATE', 'SHEET', 
+            'UPDATE', 'SHEETS', 
             where={'id_file': id_file, 'num': num},
             colunas_dados={'start_date': date, 'user_id': user_id}
         )
 
         # Calcula e define o deadline (prazo) com base na duração
         consultaSQL(
-            'UPDATE', 'SHEET',
+            'UPDATE', 'SHEETS',
             where={'id_file': id_file, 'num': num},
             colunas_dados={'deadline': 'SQL:DATE_ADD(`start_date`, INTERVAL `duration` DAY)'}
         )
@@ -656,7 +674,7 @@ def set_undo_started_task(id_file: str, num: int):
 
         # Verifica se a linha existe
         linha_existente = consultaSQL(
-            'SELECT', 'SHEET', 
+            'SELECT', 'SHEETS', 
             where={'id_file': id_file, 'num': num},
             colunas_dados={
                 'id_file': None,
@@ -678,7 +696,7 @@ def set_undo_started_task(id_file: str, num: int):
 
         # Define start_date como NULL
         consultaSQL(
-            'UPDATE', 'SHEET', 
+            'UPDATE', 'SHEETS', 
             where={'id_file': id_file, 'num': num},
             colunas_dados={
                 'start_date': None, 
@@ -703,7 +721,7 @@ def get_projects_data():
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
         data: list[dict] = consultaSQL(
-            'SELECT', 'SHEET', 
+            'SELECT', 'SHEETS', 
             where={'id_file': id_file},
             colunas_dados={
                 'duration': None,
@@ -732,7 +750,7 @@ def set_project_completed(id_file: str):
         if (not user_id or not id_team) or (user_id is None or id_team is None):
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
 
-        consulta: dict = consultaSQL('SELECT', 'PROJECT', where={'id_file': id_file}, colunas_dados={'completed': None})
+        consulta: dict = consultaSQL('SELECT', 'PROJECTS', where={'id_file': id_file}, colunas_dados={'completed': None})
         project_rows = rows_list(consulta)
 
         if not consulta:
@@ -741,13 +759,13 @@ def set_project_completed(id_file: str):
         if int(project_rows[0].get('completed', 0)) == 1:
             return jsonify({'mensagem': "O projeto já foi concluído."}), 200
 
-        consulta: list[dict] = consultaSQL('SELECT', 'SHEET', where={'id_file': id_file}, colunas_dados={'conclusion': None, 'num': None})
+        consulta: list[dict] = consultaSQL('SELECT', 'SHEETS', where={'id_file': id_file}, colunas_dados={'conclusion': None, 'num': None})
 
         for linha in consulta:
             if float(linha.get('conclusion', 0)) < 1:
                 return jsonify({'mensagem': f"A tarefa {linha.get('num')} ainda não foi concluída."}), 200
 
-        consultaSQL('UPDATE', 'PROJECT', where={'id_file': id_file}, colunas_dados={'completed': 1})
+        consultaSQL('UPDATE', 'PROJECTS', where={'id_file': id_file}, colunas_dados={'completed': 1})
 
         consulta: list[dict] = consultaSQL('SELECT', 'TEAMS', where={'id_team': id_team}, campo={'MAX': 'completed_projects'})
 
@@ -766,7 +784,7 @@ def set_project_completed(id_file: str):
         date = datetime.datetime.now().astimezone().isoformat()
 
         consultaSQL(
-            'UPDATE', 'PROJECT',
+            'UPDATE', 'PROJECTS',
             where={'id_file': id_file},
             colunas_dados={'closing_date': date}
         )
@@ -812,7 +830,7 @@ def get_team_employees():
 
         # Buscar todos os funcionários do time
         employees: list[dict] = consultaSQL(
-            'SELECT', 'EMPLOYEE', 
+            'SELECT', 'EMPLOYEES', 
             where={'id_team': id_team}, 
             colunas_dados={
                 'first_name': None, 
@@ -857,7 +875,7 @@ def get_info_team():
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
         consulta: list[dict] = consultaSQL(
-            'SELECT', 'EMPLOYEE', 
+            'SELECT', 'EMPLOYEES', 
             where={'id_team': id_team}, 
             colunas_dados={
                 'user_id': None,
@@ -893,7 +911,7 @@ def get_info_team():
 
             # Contagem de tarefas concluídas por funcionário
             consulta_tasks: list[dict] = consultaSQL(
-                'SELECT', 'SHEET',
+                'SELECT', 'SHEETS',
                 where={'user_id': emp.get('user_id'), 'conclusion': 1},
                 colunas_dados={},
                 campo={'COUNT': '*'}
@@ -908,7 +926,7 @@ def get_info_team():
 
         # Projetos em andamento no time
         projects: list[dict] = consultaSQL(
-            'SELECT', 'PROJECT',
+            'SELECT', 'PROJECTS',
             where={'id_team': id_team, 'completed': 0},
             colunas_dados={},
             campo={'COUNT': '*'}
@@ -947,7 +965,7 @@ def get_team_progress():
             return jsonify({"mensagem": "Acesso negado. Por favor, faça login."}), 401
         
         completed_projects: list[dict] = consultaSQL(
-            'SELECT', 'PROJECT',
+            'SELECT', 'PROJECTS',
             where={'id_team': id_team, 'completed': 1},
             campo={'COUNT': '*'}
         )
@@ -978,7 +996,7 @@ def get_employee_tasks(id_employee: str, id_file: str):
         if id_file != 'null':
             # Buscar todas as tarefas atribuídas ao funcionário no projeto especificado
             tarefas: list[dict] = consultaSQL(
-                'SELECT', 'SHEET', 
+                'SELECT', 'SHEETS', 
                 where={'user_id': id_employee, 'id_file': id_file},
                 colunas_dados={
                     'num': None,
@@ -993,7 +1011,7 @@ def get_employee_tasks(id_employee: str, id_file: str):
         else:
             # Buscar todas as tarefas atribuídas ao funcionário em todos os projetos do time
             tarefas: list[dict] = consultaSQL(
-                'SELECT', 'SHEET',
+                'SELECT', 'SHEETS',
                 where={'user_id': id_employee},
                 colunas_dados={
                     'num': None,
@@ -1011,7 +1029,7 @@ def get_employee_tasks(id_employee: str, id_file: str):
 
         if id_file != 'null':
             completed = consultaSQL(
-                'SELECT', 'PROJECT', 
+                'SELECT', 'PROJECTS', 
                 where={'id_file': id_file, 'user_id': id_employee}, 
                 colunas_dados={'completed': None}
             )

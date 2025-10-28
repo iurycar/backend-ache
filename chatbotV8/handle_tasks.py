@@ -18,6 +18,8 @@ def add_task(mensagem: str) -> str:
     @return: Mensagem de confirmação ou erro.
     """
     
+    # Adicionar alguma maneira de autenticação
+
     coluna: str
     id_file: list[str] = []
 
@@ -107,7 +109,7 @@ def add_task(mensagem: str) -> str:
         doc_name: str = documentos_match_ext[0].strip()
         doc_name: str = doc_name.replace(" ", "_") # Substitui espaços em brancos por underline
         doc_metadata: dict = consultaSQL(
-            "SELECT", "PROJECT", 
+            "SELECT", "PROJECTS", 
             where={"original_name": doc_name}, 
             colunas_dados={"id_file": None}
         )
@@ -123,7 +125,7 @@ def add_task(mensagem: str) -> str:
         # Se um projeto for mencionado, consulta o banco de dados pelo nome do projeto
         project_name: str = projeto_match.group(1).strip()
         project_metadata: dict = consultaSQL(
-            "SELECT", "PROJECT", 
+            "SELECT", "PROJECTS", 
             where={"project_name": project_name}, 
             colunas_dados={"id_file": None}
         )
@@ -141,7 +143,7 @@ def add_task(mensagem: str) -> str:
         if re.search(r'\.(xlsx|csv)\b', valor_doc, re.IGNORECASE):
             doc_name: str = valor_doc.replace(" ", "_")
             doc_metadata: dict = consultaSQL(
-                "SELECT", "PROJECT", 
+                "SELECT", "PROJECTS", 
                 where={"original_name": doc_name}, 
                 colunas_dados={"id_file": None}
             )
@@ -153,7 +155,7 @@ def add_task(mensagem: str) -> str:
         else:
             project_name: str = valor_doc
             project_metadata: dict = consultaSQL(
-                "SELECT", "PROJECT", 
+                "SELECT", "PROJECTS", 
                 where={"project_name": project_name}, 
                 colunas_dados={"id_file": None}
             )
@@ -188,7 +190,7 @@ def add_task(mensagem: str) -> str:
         if len(id_file) == 1:
             # Gera o próximo número da tarefa (num) automaticamente
             old_num = consultaSQL(
-                "SELECT", "SHEET", 
+                "SELECT", "SHEETS", 
                 where={"id_file": id_file[0]},
                 campo={'MAX': 'num'}
             )
@@ -197,9 +199,9 @@ def add_task(mensagem: str) -> str:
                 base = int(old_num[0]['MAX(num)'])
             num = base + 1
 
-            # Insere a nova tarefa na tabela SHEET
+            # Insere a nova tarefa na tabela SHEETS
             consultaSQL(
-                "INSERT", "SHEET", 
+                "INSERT", "SHEETS", 
                 colunas_dados={
                     "id_file": id_file[0],
                     "num": num,

@@ -1,5 +1,8 @@
 {
-    "cumprimentar": "Olá, como posso ajudá-lo? 😊",
+    "cumprimentar": [
+        "Olá, como posso ajudá-lo? 😊",
+        "Olá! Espero que você esteja tendo um ótimo dia! 😊"
+    ],
     "chat_avancado": 1,
     "minhas_tarefas": 2,
     "arquivos": 3,
@@ -13,5 +16,6 @@
     "exportar": "Para exportar dados, clique no botão 'Exportar' no segundo botão na página planilhas em arquivos importados, a tabela será exportada em formato Excel.",
     "importar": "Para importar dados do Excel, vá até a Planilhas e clique no botão 'Importar Arquivo'. O sistema aceita arquivos .xlsx com colunas: Tarefa, Duração, Status, Como Fazer e Documentos.",
     "equipe": "O módulo Equipe permite gerenciar membros, visualizar estatísticas por departamento, acompanhar performance individual e controlar permissões de acesso.",
-    "tchau": "Até mais! 😊"
+    "tchau": "Até mais! 😊",
+    "como_fazer": 8
 }

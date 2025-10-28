@@ -86,11 +86,11 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
         'overdue': 0
     }
 
-    # SELECT COUNT(*) FROM SHEET JOIN PROJECT ON SHEET.id_file = PROJECT.id_file WHERE id_team = ? AND SHEET.id_file = ? AND user_id = ?
+    # SELECT COUNT(*) FROM SHEETS JOIN PROJECTS ON SHEETS.id_file = PROJECTS.id_file WHERE id_team = ? AND SHEETS.id_file = ? AND user_id = ?
     consulta = consultaSQL(
-        'SELECT', 'SHEET', 
-        where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id,},
-        campo={'JOIN ON': ['PROJECT', 'id_file']},
+        'SELECT', 'SHEETS', 
+        where={'id_team': id_team, 'SHEETS`.`id_file': id_file, 'user_id': user_id,},
+        campo={'JOIN ON': ['PROJECTS', 'id_file']},
         colunas_dados={
             'SQL:COUNT(*)': None
         }
@@ -99,9 +99,9 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
     total = int(consulta[0].get('COUNT(*)', 0) or 0)
 
     consulta = consultaSQL(
-        'SELECT', 'SHEET', 
-        where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id, 'conclusion': 1},
-        campo={'JOIN ON': ['PROJECT', 'id_file']},
+        'SELECT', 'SHEETS', 
+        where={'id_team': id_team, 'SHEETS`.`id_file': id_file, 'user_id': user_id, 'conclusion': 1},
+        campo={'JOIN ON': ['PROJECTS', 'id_file']},
         colunas_dados={
             'SQL:COUNT(*)': None
         }
@@ -110,10 +110,10 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
     concluidas = int(consulta[0].get('COUNT(*)', 0) or 0)
 
     consulta = consultaSQL(
-        'SELECT', 'SHEET', 
-        where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id, 'conclusion': 0},
+        'SELECT', 'SHEETS', 
+        where={'id_team': id_team, 'SHEETS`.`id_file': id_file, 'user_id': user_id, 'conclusion': 0},
         where_especial={'start_date': 'IS NULL', 'end_date': 'IS NULL'},
-        campo={'JOIN ON': ['PROJECT', 'id_file']},
+        campo={'JOIN ON': ['PROJECTS', 'id_file']},
         colunas_dados={
             'SQL:COUNT(*)': None
         }
@@ -122,10 +122,10 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
     nao_iniciadas = int(consulta[0].get('COUNT(*)', 0) or 0)
 
     consulta = consultaSQL(
-        'SELECT', 'SHEET', 
-        where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id,},
+        'SELECT', 'SHEETS', 
+        where={'id_team': id_team, 'SHEETS`.`id_file': id_file, 'user_id': user_id,},
         where_especial={'conclusion': ['> 0', '< 1']},
-        campo={'JOIN ON': ['PROJECT', 'id_file']},
+        campo={'JOIN ON': ['PROJECTS', 'id_file']},
         colunas_dados={
             'id_task': None,
             'num': None,
@@ -148,12 +148,12 @@ def get_progress(id_file: str, id_team: str, user_id: str = None) -> dict:
 
     #print(f"Tarefas em andamento para o arquivo {id_file}: {in_progress}")
 
-    # select count(*) as `overdue` from `sheet` where `start_date` is not null and `deadline` is not null and datediff(NOW(), `deadline`) > 0;
+    # select count(*) as `overdue` from `SHEETS` where `start_date` is not null and `deadline` is not null and datediff(NOW(), `deadline`) > 0;
     overdue_tasks = consultaSQL(
-        'SELECT', 'SHEET',
-        where={'id_team': id_team, 'SHEET`.`id_file': id_file, 'user_id': user_id},
+        'SELECT', 'SHEETS',
+        where={'id_team': id_team, 'SHEETS`.`id_file': id_file, 'user_id': user_id},
         where_especial={'deadline': 'IS NOT NULL', 'start_date': 'IS NOT NULL', 'SQL:datediff(NOW(), `deadline`)': '> 0'},
-        campo={'JOIN ON': ['PROJECT', 'id_file']},
+        campo={'JOIN ON': ['PROJECTS', 'id_file']},
         colunas_dados={
             'SQL:COUNT(*)': None
         }
