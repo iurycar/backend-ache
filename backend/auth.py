@@ -38,12 +38,8 @@ def login():
 
     users_db: dict = consulta_db(email)   # Consulta o banco de dados pelo email
 
-    print(f"\nUsuários encontrados: {users_db}\n")
-
     if users_db:
         user_dados: dict = users_db[0]   # Verifica se o email existe no banco de dados
-        
-        print(f"Dados do usuário para {email}: {user_dados}")
 
         # Verifica se a senha está correta
         same = checkPassword(password, user_dados['password_hash'])

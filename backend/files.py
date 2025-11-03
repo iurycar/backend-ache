@@ -549,6 +549,9 @@ def update_add_row(id_file: str, num: int):
         else:
             print(f"Atualizando linha {num} do arquivo {id_file} com: {update_args}")
 
+            if 'duration' in update_args:
+                update_args['duration'] = update_args['duration'].replace(' dias', '')
+
             # Executa o UPDATE na linha alvo (chave: id_file + num atual)
             consultaSQL(
                 'UPDATE', 'SHEETS', 
