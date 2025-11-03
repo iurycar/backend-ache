@@ -22,9 +22,6 @@ database = os.environ.get("DATABASE")
 db_url = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
 ENGINE = create_engine(db_url)
 
-class Database:
-    def __init__(self):
-        pass
 
 def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_dados: dict[str, Any] = {}, campo: dict[str, str | int] = None, where_especial: dict[str, str | list] = None) -> dict | None:
     """

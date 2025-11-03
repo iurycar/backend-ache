@@ -210,7 +210,7 @@ def add_task(mensagem: str) -> str:
                     "phase": fase,
                     "status": condicao.replace(".", "").strip().lower().capitalize(),
                     "name": tarefa.capitalize(),
-                    "duration": duracao,
+                    "duration": duracao.replace(' dias', ''),
                     "text": "Texto."+str(num),
                     "reference": "Doc."+str(num),
                     "conclusion": 0
