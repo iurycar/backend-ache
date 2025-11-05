@@ -2,8 +2,11 @@ from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
 from pathlib import Path
 from PIL import Image
+import numpy as np
 import pytesseract
 import time
+import cv2
+import os
 
 """ Script para capturar uma screenshot de uma página web e extrair texto dela usando OCR. 
     Requisitos:
@@ -23,6 +26,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_screenshot(url: str) -> str:
     """ Captura uma screenshot da página web na URL fornecida e salva como imagem. """
+
     # Configurar o Selenium WebDriver para usar o Chrome em modo headless
     options = Options() # Configurações do Chrome
     options.add_argument("--headless=new") # Executa o Chrome em modo headless (sem interface gráfica)
@@ -32,11 +36,6 @@ def get_screenshot(url: str) -> str:
     driver.get(url) # Navega até a URL fornecida
 
     time.sleep(10)  # Espera a página carregar completamente
-    
-    # TODO: Salvar o nome da screenshot como o link do arquivo
-    # E fazer verificação se a imagem com o esse nome já existe
-    # Se não existir, salvar a imagem
-    # Se existir, abre a imagem existente
 
     screenshot_path = OUTPUT_DIR / f"{normalize_url(url)}.png" # Caminho para salvar a screenshot
     driver.save_screenshot(str(screenshot_path)) # Captura e salva a screenshot
@@ -49,11 +48,27 @@ def extract_text_from_image(url: str) -> None:
     # Capturar a screenshot da página web
     image_path = get_screenshot(url)
 
+    config_tesseract = f'--psm 6'
+
+    # Normaliza o caminho da imagem para evitar problemas com caracteres especiais
+    image_path = os.path.normpath(str(image_path))
+
+    # Verifica se a imagem foi carregada corretamente
+    if not os.path.exists(image_path):
+        print(f"A imagem {image_path} não foi encontrada.")
+        return
+
+    # Lê a imagem usando OpenCV
+    img = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+    # Converte a imagem para escala de cinza
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
     # Usar o pytesseract para extrair texto da imagem
-    texto = pytesseract.image_to_string(Image.open(image_path), lang="por").strip()
-    
-    print("\nTexto extraído da imagem:\n")
-    print(texto)
+    texto = pytesseract.image_to_string(gray, lang="por", config=config_tesseract).strip()
+
+    #print("\nTexto extraído da imagem:\n")
+    #print(texto)
 
     # Salvar o texto extraído em um arquivo .txt
     out_txt = OUTPUT_DIR / f"{normalize_url(url)}.txt"
@@ -62,6 +77,8 @@ def extract_text_from_image(url: str) -> None:
 
     # Depois de extrair o texto, removemos a imagem para economizar espaço
     #Path(image_path).unlink() # Descomentar, faz com que a imagem seja deletada após o processamento
+
+#TODO: Adicionar função para fazer o download do arquivo a partir do link fornecido
 
 def normalize_url(url: str) -> str:
     return url.replace('https:', '').replace('|', '_').replace('/', '_').replace(':', '_').replace('<', '_').replace('>', '_').replace('?', '_').replace('*', '_').replace('""', '_')
