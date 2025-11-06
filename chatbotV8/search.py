@@ -4,8 +4,10 @@ from pathlib import Path
 from PIL import Image
 import numpy as np
 import pytesseract
+import gdown
 import time
 import cv2
+import re
 import os
 
 """ Script para capturar uma screenshot de uma página web e extrair texto dela usando OCR. 
@@ -24,6 +26,50 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / "backend" / "dados"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+def search_docs(url: str) -> None:
+    """ Função principal para buscar documentos em uma URL fornecida.
+        Primeiro tenta baixar o arquivo diretamente. Se falhar, 
+        captura uma screenshot da página web e extrai texto dela. """
+    
+    try:
+        # Infelizmente pelo o onedrive não é possível fazer o download direto do arquivo,
+        # pois não temos acesso ao arquivo, somente leitura.
+        if "onedrive.live.com" in url or "sharepoint.com" in url:
+            pass
+        else:
+            download_file(url)
+            return
+            
+    except Exception as e:
+        print(f"Erro ao baixar o arquivo da URL {url}: {e}")
+    
+    try:
+        extract_text_from_image(url)
+        return
+    except Exception as e:
+        print(f"Erro ao processar a URL {url}: {e}")
+
+    print(f"Não foi possível extrair informações da URL: {url}")
+
+    return f"Não foi possível extrair informações da URL: {url}"
+
+#TODO: Adicionar função para fazer o download do arquivo a partir do link fornecido
+def download_file(url: str) -> None:
+    """ Tenta baixar o arquivo diretamente da URL fornecida. """
+
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+
+    if match:
+        file_id = match.group(1)
+        url_converted = f"https://drive.google.com/uc?id={file_id}" # Link convertido para download direto
+
+    output = OUTPUT_DIR / f"{normalize_url(url)}.pdf"
+    gdown.download(url_converted, str(output), quiet=False)
+    
+    print(f"Arquivo baixado em: {output}")
+
+# ---------------------------- Screenshot e OCR -----------------------------
+# ----- Esse trecho é somente uma garantia caso o download direto falhe -----
 def get_screenshot(url: str) -> str:
     """ Captura uma screenshot da página web na URL fornecida e salva como imagem. """
 
@@ -31,6 +77,7 @@ def get_screenshot(url: str) -> str:
     options = Options() # Configurações do Chrome
     options.add_argument("--headless=new") # Executa o Chrome em modo headless (sem interface gráfica)
     options.add_argument("--window-size=1920,1080") # Define o tamanho da janela para capturar a screenshot completa
+    options.add_argument("--force-device-scale-factor=3")
 
     driver = webdriver.Chrome(options=options) # Inicializa o WebDriver do Chrome
     driver.get(url) # Navega até a URL fornecida
@@ -78,10 +125,18 @@ def extract_text_from_image(url: str) -> None:
     # Depois de extrair o texto, removemos a imagem para economizar espaço
     #Path(image_path).unlink() # Descomentar, faz com que a imagem seja deletada após o processamento
 
-#TODO: Adicionar função para fazer o download do arquivo a partir do link fornecido
-
 def normalize_url(url: str) -> str:
-    return url.replace('https:', '').replace('|', '_').replace('/', '_').replace(':', '_').replace('<', '_').replace('>', '_').replace('?', '_').replace('*', '_').replace('""', '_')
+    return (
+        url.replace('https:', '')
+        .replace('|', '_')
+        .replace('/', '_')
+        .replace(':', '_')
+        .replace('<', '_')
+        .replace('>', '_')
+        .replace('?', '_')
+        .replace('*', '_')
+        .replace('"', '_')
+    )
 
 if __name__ == '__main__':
     url = "https://fiapcom-my.sharepoint.com/:b:/g/personal/pf1226_fiap_com_br/EWnpZhJcRwhGv0aAy495KrwBPZEVNaURjCEbzHaOPPXMfg?e=qFrarv"
