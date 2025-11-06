@@ -1,5 +1,5 @@
-from .ocr_reference import extract_text_from_image, normalize_url
 from backend.from_to_mysql import from_mysql_extrair
+from .search import search_docs, normalize_url
 import google.generativeai as genai
 from .handle_tasks import add_task
 from backend.db import consultaSQL
@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import datetime
 import pypdf
-import os
+import os 
 import re
 
 diretorio = Path(__file__).resolve().parent.parent
@@ -162,101 +162,70 @@ def how_to_do(mensagem: str, usuario: str, local: bool = False) -> str:
     else:
         return f"Desculpe, não consegui encontrar as instruções para a tarefa '{task}'."
 
-    """ Esse trecho está funcionando para PDFs armazenados localmente. Quando resolver o problema de
-    acesso do SharePoint, deve ser adaptado para baixar o arquivo do SharePoint e depois ler o PDF. """ 
+    link: list[dict] = consultaSQL(
+        'SELECT', 'SHEETS',
+        where={'num': task, 'project_name': proj},
+        campo={'JOIN ON': ['PROJECTS', 'id_file']},
+        colunas_dados={
+            'reference': None
+        }
+    )
 
-    if not local:
-        link: list[dict] = consultaSQL(
-            'SELECT', 'SHEETS',
-            where={'num': task, 'project_name': proj},
-            campo={'JOIN ON': ['PROJECTS', 'id_file']},
-            colunas_dados={
-                'reference': None
-            }
-        )
-
-        if link:
-            pdf_link = link[0]['reference']
-        else:
-            return f"Desculpe, não consegui encontrar o link do documento para a tarefa {task}."
-
-        if not pdf_link.startswith('http'):
-            return f"Desculpe, o hyperlink do documento referência para a tarefa '{task}' do projeto '{proj}' é inválido. 😓"
-
-        # Buscar se existe o arquivo .txt correspondente ao PDF na pasta de uploads
-        arquivo_txt = caminho_arquivos / f"{normalize_url(pdf_link)}.txt"
-
-        if not arquivo_txt.exists():
-            # Adicionar essa mensagem no começo da resposta
-            resposta = f"Desculpe a demora, eu não tinha o arquivo em memória. 💾 Para facilitar as próximas consulta do projeto '{proj}', eu já processei o PDF e extraí o texto. 📝\n\n"
-            resposta += f"Para fazer a tarefa '{task}' do projeto '{proj}', siga as instruções abaixo:\n\n"
-
-            extract_text_from_image(pdf_link)
-        
-        with open(arquivo_txt, "r", encoding="utf-8") as f:
-            texto_extraido = f.read()
-
-        # Processar o texto extraído para encontrar as instruções
-        match_ref = re.search(r'texto\.?\s*(\d+)', texto_ref, flags=re.IGNORECASE)
-        
-        if not match_ref:
-            return f"Desculpe, o texto de referência '{texto_ref}' é inválido."
-        ref_num = match_ref.group(1)
-
-        texto_pattern = rf"(?is)\btexto\.?\s*{ref_num}\s*[:.]?\s*(.*?)(?=\btexto\.?\s*\d+\s*[:.]?|\Z)"
-        match = re.search(texto_pattern, texto_extraido)
-
-        if match:
-            instrucoes = match.group(1).strip().lower().replace('\n', ' ').split('.')
-        else:
-            return f"Desculpe, não consegui encontrar as instruções para a tarefa '{task}' no documento."
-
-        print('Instruções encontradas:', instrucoes)
-
-        for instrucao in instrucoes:
-            if instrucao.strip() in ['.', '', ' ']:
-                continue
-            
-            resposta += f"• {instrucao.strip().capitalize()}.\n"
-
+    if link:
+        pdf_link = link[0]['reference']
     else:
-        # Exemplo de uso do pypdf para ler um arquivo PDF localmente
-        print(f"\nBuscando instruções no arquivo local para a tarefa '{task}'...\n")
+        return f"Desculpe, não consegui encontrar o link do documento para a tarefa {task}."
 
-        # Carregar o caminho do arquivo PDF
-        arquivo_pdf = caminho_arquivos / f"Doc.Teste.pdf"
+    if not pdf_link.startswith('http'):
+        return f"Desculpe, o hyperlink do documento referência para a tarefa '{task}' do projeto '{proj}' é inválido. 😓"
 
-        # Buscar no PDF o texto referência, por exemplo, 'texto.2'
-        # Usar o pypdf para extrair o texto do PDF e procurar pelo texto referência
+    # Buscar se existe o arquivo .txt ou .pdf correspondente ao PDF na pasta de dados
+    arquivo_txt = caminho_arquivos / f"{normalize_url(pdf_link)}.txt"
+    arquivo_pdf = caminho_arquivos / f"{normalize_url(pdf_link)}.pdf"
+
+    if not arquivo_txt.exists() and not arquivo_pdf.exists():
+        # Adicionar essa mensagem no começo da resposta
+        resposta = f"Desculpe a demora, eu não tinha o arquivo em memória. 💾 Para facilitar as próximas consulta do projeto '{proj}', eu já processei o PDF e extraí o texto. 📝\n\n"
+        resposta += f"Para fazer a tarefa '{task}' do projeto '{proj}', siga as instruções abaixo:\n\n"
+
+        search_docs(pdf_link)
+    
+    if arquivo_pdf.exists():
         with pypdf.PdfReader(str(arquivo_pdf)) as pdf:
             texto_extraido = ""
             
             for pagina in pdf.pages:
                 texto_extraido += (pagina.extract_text() or "") + "\n"
-        
-        match_ref = re.search(r'texto\.?\s*(\d+)', texto_ref, flags=re.IGNORECASE)
-        
-        if not match_ref:
-            return f"Desculpe, o texto de referência '{texto_ref}' é inválido."
-        ref_num = match_ref.group(1)
 
-        # Procurar o texto referência no texto extraído
-        # Deve parar quando encontrar o próximo texto referência ou o final do documento
-        texto_pattern = rf"(?is)\btexto\.?\s*{ref_num}\s*[:.]?\s*(.*?)(?=\btexto\.?\s*\d+\s*[:.]?|\Z)"
-        match = re.search(texto_pattern, texto_extraido)
+    elif arquivo_txt.exists():
+        # Se o arquivo .txt existir, ler o conteúdo
+        with open(arquivo_txt, "r", encoding="utf-8") as f:
+            texto_extraido = f.read()
+    else:
+        return f"Desculpe, não consegui encontrar o arquivo do documento para a tarefa '{task}'."
+
+    # Processar o texto extraído para encontrar as instruções
+    match_ref = re.search(r'texto\.?\s*(\d+)', texto_ref, flags=re.IGNORECASE)
+    
+    if not match_ref:
+        return f"Desculpe, o texto de referência '{texto_ref}' é inválido."
+    ref_num = match_ref.group(1)
+
+    texto_pattern = rf"(?is)\btexto\.?\s*{ref_num}\s*[:.]?\s*(.*?)(?=\btexto\.?\s*\d+\s*[:.]?|\Z)"
+    match = re.search(texto_pattern, texto_extraido)
+
+    if match:
+        instrucoes = match.group(1).strip().lower().replace('\n', ' ').split('.')
+    else:
+        return f"Desculpe, não consegui encontrar as instruções para a tarefa '{task}' no documento."
+
+    #print('Instruções encontradas:', instrucoes)
+
+    for instrucao in instrucoes:
+        if instrucao.strip() in ['.', '', ' ']:
+            continue
         
-        if match:
-            instrucoes = match.group(1).strip().lower().replace('\n', ' ').split('.')
-        else:
-            return f"Desculpe, não consegui encontrar as instruções para a tarefa '{task}' no documento."
-
-        print('Instruções encontradas:', instrucoes)
-
-        for instrucao in instrucoes:
-            if instrucao.strip() in ['.', '', ' ']:
-                continue
-            
-            resposta += f"• {instrucao.strip().capitalize()}.\n"
+        resposta += f"• {instrucao.strip().capitalize()}.\n"
 
     return resposta
 

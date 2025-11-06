@@ -283,7 +283,7 @@ def delete_file(id_file: str):
 
 # Rota para solicitar os arquivos do usuário
 @file_bp.route('/arquivos_usuario', methods=['GET'])
-def get_user_files():
+def get_team_files():
     arquivos: list[dict] = []
 
     user_id = session.get('user_id')
@@ -1004,7 +1004,7 @@ def get_employee_tasks_detail(id_employee: str, id_file: str):
                 colunas_dados={
                     'num': None,
                     'name': None,
-                    'duration': None,
+                    'SQL:CONCAT(`duration`, " dias") AS `duration`': None,
                     'conclusion': None,
                     'start_date': None,
                     'deadline': None,
@@ -1019,7 +1019,7 @@ def get_employee_tasks_detail(id_employee: str, id_file: str):
                 colunas_dados={
                     'num': None,
                     'name': None,
-                    'duration': None,
+                    'SQL:CONCAT(`duration`, " dias") AS `duration`': None,
                     'conclusion': None,
                     'start_date': None,
                     'deadline': None,
@@ -1057,7 +1057,7 @@ def get_employee_tasks_detail(id_employee: str, id_file: str):
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
-@file_bp.route('/employee/tasks', methods=['GET'])
+@file_bp.route('/employee/tasks/gantt', methods=['GET'])
 def get_employee_tasks():
     try:
         user_id = session.get('user_id')
@@ -1101,7 +1101,7 @@ def get_employee_tasks():
         return jsonify({"mensagem": f"Ocorreu um erro."}), 500
 
 
-@file_bp.route('/employee/tasks/update/<id_file>/<int:num>', methods=['PATCH'])
+@file_bp.route('/employee/tasks/gantt/update/<id_file>/<int:num>', methods=['PATCH'])
 def update_employee_task(id_file: str, num: int):
     try:
         user_id = session.get('user_id')
@@ -1132,7 +1132,7 @@ def update_employee_task(id_file: str, num: int):
         if not update_args:
             return jsonify({"mensagem": "Nada para atualizar."}), 400
 
-        linha_existente = consultaSQL(
+        linha_existente: list[dict] = consultaSQL(
             'SELECT', 'SHEETS', 
             where={'id_file': id_file, 'num': num, 'user_id': user_id},
             colunas_dados={'id_file': None, 'num': None}
@@ -1140,7 +1140,7 @@ def update_employee_task(id_file: str, num: int):
 
         if not linha_existente:
             try:
-                max_result = consultaSQL(
+                max_result: list[dict] = consultaSQL(
                     'SELECT', 'SHEETS', 
                     where={'id_file': id_file}, 
                     colunas_dados={},
