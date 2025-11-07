@@ -5,5 +5,7 @@
     "Fase": ["fase", "etapa", "estágio", "passo", "estagio", "fas.", "fa.", "fas"],
     "Condição": ["condição", "status", "estado", "cond.", "cond", "cod", "cod.", "condiçao", "condicão"],
     "Documento": ["documentos", "arquivos", "fichas", "doc.", "doc"],
-    "Projeto": ["projeto", "proj.", "proj"]
+    "Projeto": ["projeto", "proj.", "proj"],
+    "Texto": ["texto", "txt", "text", "texto referência"],
+    "Link": ["link pdf", "link", "pdf", "documento pdf", "google drive", "hiperlink", "hyperlink"]
 }

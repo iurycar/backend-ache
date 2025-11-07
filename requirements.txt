@@ -11,3 +11,6 @@ pypdf
 selenium
 pillow
 pytesseract
+gdown
+opencv-python
+numpy

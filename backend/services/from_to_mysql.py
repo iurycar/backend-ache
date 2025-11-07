@@ -1,10 +1,11 @@
 from string import Template
 from pathlib import Path
-from .db import ENGINE
 import pandas as pd
 import openpyxl
 
-diretorio = Path(__file__).parent
+from .db import ENGINE
+
+diretorio = Path(__file__).parent.parent
 path = diretorio / "uploads" 
 
 def to_mysql_inserir(id_file: str) -> None:
@@ -89,7 +90,7 @@ def from_mysql_extrair(id_file:str) -> None:
         }
 
         # Consulta SQL para buscar os dados na tabela SHEETS com base no id_file
-        template_sql_query = Template("SELECT `num`,`classe`,`category`,`phase`,`status`,`name`,CONCAT(`duration`, ' dias') AS `duration`, `text`,`reference`,`conclusion` FROM `SHEETS` WHERE `id_file` = '$id_file'")
+        template_sql_query = Template("SELECT `num`,`classe`,`category`,`phase`,`status`,`name`,CONCAT(`duration`, ' dias') AS `duration`, `text`,`reference`,`conclusion` * 100 AS `conclusion` FROM `SHEETS` WHERE `id_file` = '$id_file'")
         sql_query = template_sql_query.safe_substitute(id_file=id_file)
 
         print(f"Buscando dados na tabela SHEETS para o arquivo '{id_file}'.")

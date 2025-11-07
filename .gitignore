@@ -1,7 +1,10 @@
 .env
-chatbotV8/__pycache__
+chatbot_melora/__pycache__
 backend/__pycache__
-backend/uploads/871fecfc-109b-4719-9d1f-29f8cdba357a.xlsx
-backend/uploads/0fd2ff3a-70f5-4b5f-b3ed-a1a6ec5c9c7d.xlsx
-backend/uploads/10fc54d5-7eed-4744-b27c-a103a72a4a1f.xlsx
-backend/uploads/dc19fac4-e472-46b4-9aeb-b3fc61bc7eec.xlsx
+backend/routes/__pycache__
+backend/services/__pycache__
+
+backend/uploads/3a9d7ea3-750a-4a59-a8c1-e8401ef17490.xlsx
+backend/uploads/efe846ed-e9f5-40f3-91e1-35ab19df9a9b.xlsx
+backend/uploads/7aa6ce4f-1616-43c8-951f-7085dcd3215e.xlsx
+backend/uploads/d4139c73-3121-4ded-b304-32c5850baee7.xlsx
