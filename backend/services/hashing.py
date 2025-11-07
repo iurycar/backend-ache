@@ -1,8 +1,6 @@
 import bcrypt
 
-""""
-    Esse arquivo é responsável por fazer o hash e a verificação de senhas
-"""
+""" Esse arquivo é responsável por fazer o hash e a verificação de senhas usando bcrypt. """
 
 # Função para fazer o hash da senha
 def hashPassword(password: str) -> str:

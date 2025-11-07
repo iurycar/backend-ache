@@ -1,6 +1,7 @@
 from .learn import get_keywords, get_response_keywords
 from .handle_demands import demands, advanced_chat
 from .ahoCorasick import Automaton
+
 from collections import deque
 import unicodedata
 import random

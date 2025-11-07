@@ -2,8 +2,8 @@ from pathlib import Path
 import json
 
 diretorio = Path(__file__).parent
-caminho_termo = diretorio / "dados" / "termos_chaves.json"
-caminho_resposta = diretorio / "dados" / "respostas.json"
+caminho_termo = diretorio / "data" / "termos_chaves.json"
+caminho_resposta = diretorio / "data" / "respostas.json"
 
 def get_keywords() -> dict[str, list[str]]:
     """ Função para acessar os dados treinados para perguntas no arquivo termos_chaves.json.

@@ -107,7 +107,7 @@ def consultaSQL(tipo: str, tabela: str, where: dict[str, Any] = None, colunas_da
                     template_sql_query = Template("SELECT $colunas from `$tabela` WHERE $where_clause")
                     sql_query = template_sql_query.safe_substitute(colunas=colunas, tabela=tabela, where_clause=where_clause)
 
-                #print(f"\nSQL Query: {sql_query} -> {params}")
+                print(f"\nSQL Query: {sql_query} -> {params}")
 
                 cursor.execute(sql_query, params)
 

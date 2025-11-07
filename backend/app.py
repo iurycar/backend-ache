@@ -1,12 +1,17 @@
 from flask import Flask, request, jsonify, session, send_from_directory
-from chatbotV8.chatbot import chatbot_bp
 from dotenv import load_dotenv
 from datetime import timedelta
 from flask_cors import CORS
-from .files import file_bp
-from .auth import auth_bp
 from pathlib import Path
 import os
+
+from chatbot_melora.chatbot import chatbot_bp
+
+from .routes.employee_team import employee_team_bp
+from .routes.projects import project_bp
+from .routes.tasks import tasks_bp
+from .routes.files import file_bp
+from .routes.auth import auth_bp
 
 """
     Esse arquivo é responsável por servir como porta de entrada da aplicação, enquanto os outros lidam com o chatbot, a importação e exportação de arquivos
@@ -46,6 +51,9 @@ CORS(app, supports_credentials=True, origins=origins)
 app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(file_bp, url_prefix='/')
 app.register_blueprint(chatbot_bp, url_prefix='/')
+app.register_blueprint(tasks_bp, url_prefix='/')
+app.register_blueprint(project_bp, url_prefix='/')
+app.register_blueprint(employee_team_bp, url_prefix='/')
 
 # Configura o diretório para armazenar os arquivos importados
 diretorio = Path(__file__).parent

@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify, session
-from .hashing import checkPassword
-from .db import consultaSQL
 from pathlib import Path
+
+from backend.services.hashing import checkPassword
+from backend.services.db import consultaSQL
 
 """
     Esse arquivo é responsável por criar as rotas e os meios de autenticação
@@ -47,19 +48,18 @@ def login():
         if user_dados and same:
             session['user_id'] = user_dados['user_id']
             session['user_email'] = email
-            session['user_name'] = user_dados['first_name']
-            session['user_last_name'] = user_dados['last_name']
+            session['user_name'] = user_dados['first_name'] + " " + user_dados['last_name']
             session['user_role'] = user_dados['role']
             session['user_team'] = user_dados['id_team']
-            session.permanent = True
+            session.permanent = True       
 
             print(f"Login bem-sucedido para o usuário: {user_dados['user_id']}")
             return jsonify({
                 "mensagem": "Login bem-sucedido",
                 "user": {
-                    "name": user_dados['first_name'],
+                    "name": session.get('user_name'),
                     "email": email,
-                    "role": user_dados['role'],
+                    "role": session.get('user_role'),
                 }
             }), 200
         
@@ -82,6 +82,18 @@ def status():
             }
         }), 200
     return jsonify({"isAuthenticated": False}), 401
+
+@auth_bp.route('/user', methods=['GET'])
+def get_user():
+    user_id = session.get('user_id')
+    
+    if user_id:
+        print(f"Recuperando informações do usuário: {session.get('user_name')}")
+        return jsonify({
+            "user": {
+                "name": session.get('user_name'),
+            }
+        }), 200
 
 # Rota de logout
 @auth_bp.route('/logout', methods=['POST'])

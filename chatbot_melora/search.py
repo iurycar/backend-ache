@@ -10,20 +10,20 @@ import cv2
 import re
 import os
 
-""" Script para capturar uma screenshot de uma página web e extrair texto dela usando OCR. 
+"""
+    Script para fazer download de um arquivo na nuvem, 
+    caso falhe captura uma screenshot de uma página web e extrai texto dela usando OCR.
+    
     Requisitos:
     - Instalar o Tesseract OCR:
     - Windows: https://github.com/UB-Mannheim/tesseract/wiki
-    - Após a instalação, adicione o caminho do executável do Tesseract à variável de ambiente PATH.
-    
-    - Instalar as bibliotecas Python necessárias:
-    pip install selenium pillow pytesseract"""
+"""
 
 # Caminho para o Tesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = BASE_DIR / "backend" / "dados"
+OUTPUT_DIR = BASE_DIR / "backend" / "data"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def search_docs(url: str) -> None:
@@ -53,7 +53,6 @@ def search_docs(url: str) -> None:
 
     return f"Não foi possível extrair informações da URL: {url}"
 
-#TODO: Adicionar função para fazer o download do arquivo a partir do link fornecido
 def download_file(url: str) -> None:
     """ Tenta baixar o arquivo diretamente da URL fornecida. """
 
@@ -77,7 +76,7 @@ def get_screenshot(url: str) -> str:
     options = Options() # Configurações do Chrome
     options.add_argument("--headless=new") # Executa o Chrome em modo headless (sem interface gráfica)
     options.add_argument("--window-size=1920,1080") # Define o tamanho da janela para capturar a screenshot completa
-    options.add_argument("--force-device-scale-factor=3")
+    options.add_argument("--force-device-scale-factor=2")
 
     driver = webdriver.Chrome(options=options) # Inicializa o WebDriver do Chrome
     driver.get(url) # Navega até a URL fornecida
